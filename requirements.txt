@@ -1,0 +1,5 @@
+kokoro>=0.9.4
+soundfile>=0.12
+numpy>=1.24
+gradio>=4.0
+pytest>=8.0
