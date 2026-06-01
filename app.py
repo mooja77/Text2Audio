@@ -1,6 +1,8 @@
 """Local Gradio web app: plain-text book -> chaptered .m4b audiobook."""
 import os
+import re
 
+import numpy as np
 import gradio as gr
 
 from pipeline.parse import parse_chapters
@@ -16,6 +18,17 @@ def _read_text(path: str) -> str:
         return f.read()
 
 
+def _require_voice(voice):
+    if voice not in PRESET_VOICES:
+        raise gr.Error("Please select a narrator voice.")
+
+
+def _safe_filename(name: str) -> str:
+    """Make an output filename safe on Windows (strip illegal chars)."""
+    cleaned = re.sub(r"[^\w.-]+", "_", (name or "").strip()).strip("_.")
+    return cleaned or "audiobook"
+
+
 def detect_chapters(txt_file, marker, book_title):
     if txt_file is None:
         return [["(upload a .txt file first)"]]
@@ -27,6 +40,7 @@ def detect_chapters(txt_file, marker, book_title):
 
 
 def preview_voice(voice):
+    _require_voice(voice)
     synth = Synthesizer(voice=voice, lang_code=PRESET_VOICES[voice])
     return (SAMPLE_RATE, synth.preview())
 
@@ -35,6 +49,7 @@ def generate(txt_file, voice, book_title, author, cover, speed, marker,
              progress=gr.Progress()):
     if txt_file is None:
         raise gr.Error("Please upload a .txt file first.")
+    _require_voice(voice)
     chapters = parse_chapters(_read_text(txt_file), marker=marker or "## ",
                               default_title=book_title or "Audiobook")
     if not chapters:
@@ -48,12 +63,16 @@ def generate(txt_file, voice, book_title, author, cover, speed, marker,
     for ci, ch in enumerate(chapters):
         progress(ci / len(chapters), desc=f"Chapter {ci + 1}/{len(chapters)}: {ch.title}")
         audio = synth.synth_chunks(chunk_text(ch.text))
+        if len(audio) == 0:
+            # Empty/failed chapter (e.g. a section-divider marker): emit a short
+            # silence so every chapter has a valid, non-degenerate marker and
+            # ffmpeg never receives a zero-length stream.
+            audio = np.zeros(int(0.5 * SAMPLE_RATE), dtype=np.float32)
         wav_path = os.path.join(OUTPUT_DIR, f"chapter_{ci + 1:03d}.wav")
         write_wav(audio, wav_path)
         chapter_wavs.append((ch.title, wav_path))
 
-    safe_name = (book_title or "audiobook").strip().replace(" ", "_") or "audiobook"
-    out_path = os.path.join(OUTPUT_DIR, f"{safe_name}.m4b")
+    out_path = os.path.join(OUTPUT_DIR, f"{_safe_filename(book_title)}.m4b")
     progress(0.99, desc="Assembling M4B...")
     build_m4b(chapter_wavs, out_path, book_title=book_title or None,
               author=author or None, cover=cover)
