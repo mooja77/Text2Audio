@@ -20,6 +20,8 @@ from pipeline.synth import Synthesizer, PRESET_VOICES, SAMPLE_RATE
 from backend.library import Library, new_id
 from backend.jobs import JobManager
 from backend.render import render_audiobook, remaster, purge_wavs
+from backend.pronunciations import PronunciationStore
+from pipeline.normalize import normalize_text, BUILTIN_PRONUNCIATIONS
 from pipeline.ingest import build_book_text
 from pipeline.parse import parse_chapters
 
@@ -29,6 +31,8 @@ LIBRARY_DIR = os.environ.get("T2A_LIBRARY_DIR", str(ROOT / "library"))
 
 SYNTH_FACTORY = Synthesizer          # tests monkeypatch this
 library = Library(LIBRARY_DIR)
+PRON_PATH = os.environ.get("T2A_PRON_PATH", os.path.join(os.path.dirname(LIBRARY_DIR), "data", "pronunciations.json"))
+pron = PronunciationStore(PRON_PATH)
 jobs = JobManager()
 _render_lock = threading.Lock()      # one GPU render at a time
 
@@ -123,7 +127,7 @@ def start_render(req: RenderRequest):
             render_audiobook(book_text=req.bookText, voice=req.voice, speed=req.speed,
                              title=req.title, author=req.author, cover_path=None,
                              library=library, job_id=job_id, emit=emit,
-                             synth_factory=SYNTH_FACTORY)
+                             synth_factory=SYNTH_FACTORY, custom_rules=pron.get_all())
         finally:
             _render_lock.release()
 
@@ -177,6 +181,14 @@ class RetagRequest(BaseModel):
 class RemasterRequest(BaseModel):
     bitrate: str = "128k"
     master: bool = True
+
+
+class PronRule(BaseModel):
+    sayAs: str
+
+
+class NormalizePreviewRequest(BaseModel):
+    text: str
 
 
 @app.post("/api/library/{id}/retag")
@@ -241,6 +253,30 @@ def library_purge(id: str):
         return purge_wavs(library, id)
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail="not found")
+
+
+@app.get("/api/pronunciations")
+def pronunciations_list():
+    return {"builtin": BUILTIN_PRONUNCIATIONS, "custom": pron.get_all()}
+
+
+@app.put("/api/pronunciations/{word}")
+def pronunciations_set(word: str, rule: PronRule):
+    if not rule.sayAs.strip():
+        raise HTTPException(status_code=400, detail="sayAs is required")
+    pron.set_rule(word, rule.sayAs.strip())
+    return {"custom": pron.get_all()}
+
+
+@app.delete("/api/pronunciations/{word}")
+def pronunciations_remove(word: str):
+    pron.remove(word)
+    return {"custom": pron.get_all()}
+
+
+@app.post("/api/normalize-preview")
+def normalize_preview(req: NormalizePreviewRequest):
+    return {"normalized": normalize_text(req.text, pron.get_all())}
 
 
 # IMPORTANT: keep this static mount as the LAST route registration in the file.
