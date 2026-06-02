@@ -10,8 +10,8 @@ const Library = {
     wrap.innerHTML = `<div class="libgrid">${items.map(m => `
       <div class="libcard" data-id="${m.id}">
         <div class="cover">${m.coverFile ? `<img src="/api/cover/${m.id}">` : "🎧"}</div>
-        <div class="b"><div class="t">${m.title}</div>
-          <div class="m">${m.author || "—"}</div>
+        <div class="b"><div class="t">${T2A.esc(m.title)}</div>
+          <div class="m">${T2A.esc(m.author || "—")}</div>
           <div class="m">${fmtDur(m.durationSeconds)} · ${m.chapters.length} ch</div></div>
       </div>`).join("")}</div>`;
     wrap.querySelectorAll(".libcard").forEach(c => c.onclick = () => this.detail(c.dataset.id));
