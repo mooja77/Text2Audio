@@ -54,6 +54,9 @@ class _FakeSynth:
         pass
     def synth_chunks(self, chunks, progress=None):
         return np.zeros(int(0.1 * SAMPLE_RATE), dtype=np.float32)
+    def synth_paragraphs(self, paragraphs, progress=None):
+        n = sum(len(p) for p in paragraphs)
+        return np.zeros(int(0.1 * SAMPLE_RATE) * max(1, n), dtype=np.float32)
 
 
 def test_render_job_streams_done_and_creates_library_entry(client, monkeypatch):
