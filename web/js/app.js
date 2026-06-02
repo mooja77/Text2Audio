@@ -1,6 +1,11 @@
 // Shared state, API helpers, tab routing.
 const T2A = {
   state: { voices: [], files: [], bookText: "", chapters: [], voice: "af_heart", speed: 0.9 },
+  // Escape user-controlled text before interpolating into innerHTML.
+  esc(s) {
+    return String(s ?? "").replace(/[&<>"']/g,
+      c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  },
   async api(path, opts) {
     const r = await fetch(path, opts);
     if (!r.ok) throw new Error((await r.text()) || r.status);
