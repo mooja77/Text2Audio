@@ -7,7 +7,7 @@ import webbrowser
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, File, Request, UploadFile
+from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -114,6 +114,61 @@ def start_render(req: RenderRequest):
 async def render_stream(job_id: str):
     return StreamingResponse(jobs.stream(job_id), media_type="text/event-stream",
                              headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+@app.get("/api/library")
+def library_list():
+    return library.list()
+
+
+@app.get("/api/library/{id}")
+def library_detail(id: str):
+    m = library.get(id)
+    if m is None:
+        raise HTTPException(status_code=404, detail="not found")
+    return m
+
+
+@app.get("/api/audio/{id}")
+def library_audio(id: str):
+    path = library.audio_path(id)
+    if not os.path.isfile(path):
+        raise HTTPException(status_code=404, detail="no audio")
+    return FileResponse(path, media_type="audio/mp4")  # Starlette handles Range -> 206
+
+
+@app.get("/api/cover/{id}")
+def library_cover(id: str):
+    p = library.cover_path(id)
+    if not p:
+        raise HTTPException(status_code=404, detail="no cover")
+    return FileResponse(p, media_type="image/jpeg")
+
+
+class RetagRequest(BaseModel):
+    title: str | None = None
+    author: str | None = None
+
+
+@app.post("/api/library/{id}/retag")
+def library_retag(id: str, req: RetagRequest):
+    m = library.get(id)
+    if m is None:
+        raise HTTPException(status_code=404, detail="not found")
+    if req.title is not None:
+        m["title"] = req.title
+    if req.author is not None:
+        m["author"] = req.author
+    library.save_manifest(id, m)
+    return m
+
+
+@app.delete("/api/library/{id}")
+def library_delete(id: str):
+    if library.get(id) is None:
+        raise HTTPException(status_code=404, detail="not found")
+    library.delete(id)
+    return {"deleted": id}
 
 
 # IMPORTANT: keep this static mount as the LAST route registration in the file.
