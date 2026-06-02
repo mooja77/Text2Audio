@@ -6,8 +6,8 @@ from pipeline.synth import SAMPLE_RATE
 
 
 class FakeSynth:
-    def __init__(self, voice, lang_code, speed=1.0):
-        self.voice = voice
+    def __init__(self, voice_id, speed=1.0):
+        self.voice = voice_id
     def synth_chunks(self, chunks, progress=None):
         return np.zeros(int(0.2 * SAMPLE_RATE) * max(1, len(chunks)), dtype=np.float32)
     def synth_paragraphs(self, paragraphs, progress=None):
@@ -108,3 +108,18 @@ def test_render_applies_custom_pronunciations(tmp_path):
     joined = " ".join(seen)
     assert "bar" in joined and "foo" not in joined
     assert "eighteen oh-one" in joined  # built-in number expansion also ran
+
+
+def test_render_factory_called_with_voice_and_speed(tmp_path):
+    lib = Library(str(tmp_path))
+    seen = {}
+
+    def factory(voice_id, speed):
+        seen["voice"], seen["speed"] = voice_id, speed
+        return FakeSynth(voice_id, speed)
+
+    render_audiobook(book_text="## A\n\nHello.", voice="my_clone", speed=0.9, title="T",
+                     author="", cover_path=None, library=lib, job_id="jf",
+                     emit=lambda e: None, synth_factory=factory)
+    assert seen == {"voice": "my_clone", "speed": 0.9}
+    assert lib.get("jf")["voice"] == "my_clone"

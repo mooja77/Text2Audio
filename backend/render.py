@@ -15,6 +15,10 @@ from pipeline.normalize import normalize_text
 WAV_SUBDIR = "wav"
 
 
+def _default_synth_factory(voice_id, speed):
+    return Synthesizer(voice=voice_id, lang_code=PRESET_VOICES[voice_id], speed=float(speed))
+
+
 def _wav_dir(library, job_id: str) -> str:
     d = os.path.join(library.new_dir(job_id), WAV_SUBDIR)
     os.makedirs(d, exist_ok=True)
@@ -32,7 +36,7 @@ def _chapter_meta(chapter_wavs):
 
 
 def render_audiobook(*, book_text, voice, speed, title, author, cover_path,
-                     library, job_id, emit, synth_factory=Synthesizer,
+                     library, job_id, emit, synth_factory=_default_synth_factory,
                      custom_rules=None) -> dict:
     chapters = parse_chapters(book_text, default_title=title or "Audiobook")
     workdir = library.new_dir(job_id)
@@ -48,7 +52,7 @@ def render_audiobook(*, book_text, voice, speed, title, author, cover_path,
 
 def _render_into(workdir, chapters, *, voice, speed, title, author, cover_path,
                  library, job_id, emit, synth_factory, custom_rules=None) -> dict:
-    synth = synth_factory(voice=voice, lang_code=PRESET_VOICES[voice], speed=float(speed))
+    synth = synth_factory(voice, float(speed))
     wav_dir = _wav_dir(library, job_id)
 
     n = len(chapters)
