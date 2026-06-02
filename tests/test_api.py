@@ -50,13 +50,14 @@ from pipeline.synth import SAMPLE_RATE
 
 
 class _FakeSynth:
-    def __init__(self, voice, lang_code, speed=1.0):
+    def __init__(self, voice_id, speed=1.0):
         pass
     def synth_chunks(self, chunks, progress=None):
         return np.zeros(int(0.1 * SAMPLE_RATE), dtype=np.float32)
     def synth_paragraphs(self, paragraphs, progress=None):
-        n = sum(len(p) for p in paragraphs)
-        return np.zeros(int(0.1 * SAMPLE_RATE) * max(1, n), dtype=np.float32)
+        return np.zeros(int(0.1 * SAMPLE_RATE), dtype=np.float32)
+    def preview(self, text="x"):
+        return np.zeros(int(0.1 * SAMPLE_RATE), dtype=np.float32)
 
 
 def test_render_job_streams_done_and_creates_library_entry(client, monkeypatch):
@@ -153,9 +154,9 @@ def test_second_render_rejected_while_busy(client, monkeypatch):
     gate = threading.Event()
 
     class _BlockingSynth:
-        def __init__(self, voice, lang_code, speed=1.0):
+        def __init__(self, voice_id, speed=1.0):
             pass
-        def synth_chunks(self, chunks, progress=None):
+        def synth_paragraphs(self, paragraphs, progress=None):
             gate.wait(timeout=5)
             return np.zeros(int(0.1 * SAMPLE_RATE), dtype=np.float32)
 
@@ -238,3 +239,47 @@ def test_render_uses_custom_pronunciations(client, monkeypatch):
     server.pron.set_rule("foo", "bar")
     r = client.post("/api/render", json={"bookText": "## A\n\nThe foo.", "voice": "af_heart", "title": "P"})
     assert r.status_code == 200
+
+
+def test_voices_includes_kind(client):
+    voices = client.get("/api/voices").json()
+    assert all("kind" in v for v in voices)
+    assert any(v["id"] == "bm_george" and v["kind"] == "preset" for v in voices)
+
+
+def _wav_bytes():
+    import io, soundfile as sf
+    buf = io.BytesIO()
+    sf.write(buf, np.zeros(16000, dtype=np.float32), 16000, format="WAV")
+    return buf.getvalue()
+
+
+def test_clone_create_list_delete(client):
+    files = {"audio": ("ref.wav", _wav_bytes(), "audio/wav")}
+    data = {"name": "Cloney", "refText": "hello there"}
+    r = client.post("/api/voices/clone", files=files, data=data)
+    assert r.status_code == 200
+    vid = r.json()["id"]
+    voices = client.get("/api/voices").json()
+    cloned = [v for v in voices if v["id"] == vid]
+    assert cloned and cloned[0]["kind"] == "cloned" and cloned[0]["name"] == "Cloney"
+    assert client.delete(f"/api/voices/{vid}").status_code == 200
+    assert not any(v["id"] == vid for v in client.get("/api/voices").json())
+
+
+def test_clone_rejects_empty_name(client):
+    files = {"audio": ("ref.wav", _wav_bytes(), "audio/wav")}
+    assert client.post("/api/voices/clone", files=files, data={"name": "  "}).status_code == 400
+
+
+def test_render_with_cloned_voice(client, monkeypatch):
+    import server
+    monkeypatch.setattr(server, "SYNTH_FACTORY", _FakeSynth)
+    vid = client.post("/api/voices/clone", files={"audio": ("r.wav", _wav_bytes(), "audio/wav")},
+                      data={"name": "C"}).json()["id"]
+    r = client.post("/api/render", json={"bookText": "## A\n\nhi", "voice": vid, "title": "X"})
+    assert r.status_code == 200
+
+
+def test_render_unknown_voice_still_400(client):
+    assert client.post("/api/render", json={"bookText": "## A\n\nhi", "voice": "nope"}).status_code == 400
