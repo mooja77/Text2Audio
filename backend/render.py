@@ -10,6 +10,7 @@ from pipeline.parse import parse_chapters
 from pipeline.chunk import chunk_paragraphs
 from pipeline.synth import Synthesizer, PRESET_VOICES, SAMPLE_RATE
 from pipeline.assemble import write_wav, build_m4b, DEFAULT_BITRATE
+from pipeline.normalize import normalize_text
 
 WAV_SUBDIR = "wav"
 
@@ -31,20 +32,22 @@ def _chapter_meta(chapter_wavs):
 
 
 def render_audiobook(*, book_text, voice, speed, title, author, cover_path,
-                     library, job_id, emit, synth_factory=Synthesizer) -> dict:
+                     library, job_id, emit, synth_factory=Synthesizer,
+                     custom_rules=None) -> dict:
     chapters = parse_chapters(book_text, default_title=title or "Audiobook")
     workdir = library.new_dir(job_id)
     try:
         return _render_into(workdir, chapters, voice=voice, speed=speed, title=title,
                             author=author, cover_path=cover_path, library=library,
-                            job_id=job_id, emit=emit, synth_factory=synth_factory)
+                            job_id=job_id, emit=emit, synth_factory=synth_factory,
+                            custom_rules=custom_rules)
     except Exception:
         shutil.rmtree(workdir, ignore_errors=True)
         raise
 
 
 def _render_into(workdir, chapters, *, voice, speed, title, author, cover_path,
-                 library, job_id, emit, synth_factory) -> dict:
+                 library, job_id, emit, synth_factory, custom_rules=None) -> dict:
     synth = synth_factory(voice=voice, lang_code=PRESET_VOICES[voice], speed=float(speed))
     wav_dir = _wav_dir(library, job_id)
 
@@ -54,7 +57,7 @@ def _render_into(workdir, chapters, *, voice, speed, title, author, cover_path,
     for i, ch in enumerate(chapters):
         emit({"type": "progress", "chapterIndex": i, "chapterCount": n,
               "chapterTitle": ch.title, "percent": round(i / max(1, n) * 100)})
-        audio = synth.synth_paragraphs(chunk_paragraphs(ch.text))
+        audio = synth.synth_paragraphs(chunk_paragraphs(normalize_text(ch.text, custom_rules)))
         if len(audio) == 0:
             audio = np.zeros(int(0.5 * SAMPLE_RATE), dtype=np.float32)
         rel = os.path.join(WAV_SUBDIR, f"chapter_{i + 1:03d}.wav")
