@@ -1,18 +1,21 @@
 """Text2Audio Studio — FastAPI backend serving the web UI over the TTS pipeline."""
+import io
 import os
 import shutil
 import sys
 import threading
 import webbrowser
 from contextlib import asynccontextmanager
+
+import soundfile as sf
 from pathlib import Path
 
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from pipeline.synth import Synthesizer, PRESET_VOICES
+from pipeline.synth import Synthesizer, PRESET_VOICES, SAMPLE_RATE
 from backend.library import Library, new_id
 from backend.jobs import JobManager
 from backend.render import render_audiobook
@@ -169,6 +172,27 @@ def library_delete(id: str):
         raise HTTPException(status_code=404, detail="not found")
     library.delete(id)
     return {"deleted": id}
+
+
+class PreviewRequest(BaseModel):
+    voice: str
+
+
+_PREVIEW_TEXT = "This is a sample of the selected narrator voice."
+
+
+@app.post("/api/voice-preview")
+def voice_preview(req: PreviewRequest):
+    if req.voice not in PRESET_VOICES:
+        raise HTTPException(status_code=400, detail="unknown voice")
+    synth = SYNTH_FACTORY(voice=req.voice, lang_code=PRESET_VOICES[req.voice])
+    if hasattr(synth, "preview"):
+        audio = synth.preview(_PREVIEW_TEXT)
+    else:
+        audio = synth.synth_chunks([_PREVIEW_TEXT])
+    buf = io.BytesIO()
+    sf.write(buf, audio, SAMPLE_RATE, format="WAV")
+    return Response(content=buf.getvalue(), media_type="audio/wav")
 
 
 # IMPORTANT: keep this static mount as the LAST route registration in the file.
