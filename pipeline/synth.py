@@ -31,17 +31,11 @@ def concat_with_gaps(audio_arrays, gap_seconds: float = 0.3, sample_rate: int = 
     return np.concatenate(out)
 
 
-class Synthesizer:
-    def __init__(self, voice: str = "af_heart", lang_code: str = "a",
-                 device: str = "cuda", speed: float = 1.0):
-        from kokoro import KPipeline
-        self.pipeline = KPipeline(lang_code=lang_code, device=device)
-        self.voice = voice
-        self.speed = speed
+class BaseSynthesizer:
+    """Engine-agnostic synthesis: subclasses implement synth_chunk(text)."""
 
     def synth_chunk(self, text: str) -> np.ndarray:
-        parts = [audio for _, _, audio in self.pipeline(text, voice=self.voice, speed=self.speed)]
-        return concat_with_gaps(parts, gap_seconds=0.0)
+        raise NotImplementedError
 
     def synth_chunks(self, chunks, progress=None) -> np.ndarray:
         out = []
@@ -85,3 +79,16 @@ class Synthesizer:
 
     def preview(self, text: str = "This is a sample of the selected narrator voice.") -> np.ndarray:
         return self.synth_chunk(text)
+
+
+class Synthesizer(BaseSynthesizer):
+    def __init__(self, voice: str = "af_heart", lang_code: str = "a",
+                 device: str = "cuda", speed: float = 1.0):
+        from kokoro import KPipeline
+        self.pipeline = KPipeline(lang_code=lang_code, device=device)
+        self.voice = voice
+        self.speed = speed
+
+    def synth_chunk(self, text: str) -> np.ndarray:
+        parts = [audio for _, _, audio in self.pipeline(text, voice=self.voice, speed=self.speed)]
+        return concat_with_gaps(parts, gap_seconds=0.0)
