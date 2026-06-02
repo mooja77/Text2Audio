@@ -22,3 +22,13 @@ def test_persists_across_instances(tmp_path):
     p = str(tmp_path / "p.json")
     PronunciationStore(p).set_rule("Foo", "Bar")
     assert PronunciationStore(p).get_all() == {"foo": "Bar"}
+
+
+def test_corrupt_file_self_heals(tmp_path):
+    p = str(tmp_path / "p.json")
+    with open(p, "w", encoding="utf-8") as f:
+        f.write("{ not valid json")
+    store = PronunciationStore(p)
+    assert store.get_all() == {}          # doesn't crash on the hot path
+    store.set_rule("foo", "bar")          # and editing still works (overwrites)
+    assert PronunciationStore(p).get_all() == {"foo": "bar"}
