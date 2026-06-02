@@ -24,9 +24,12 @@ const Library = {
     try { item = await T2A.api(`/api/library/${id}`); } catch (e) { T2A.toast("Not found"); return; }
     el.innerHTML = `<button class="backlink" id="back">← Library</button>
       <div id="playerwrap"></div>
-      <div style="margin-top:16px;display:flex;gap:8px">
+      <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn" id="retag">Retag</button>
-        <button class="btn" id="del">Delete</button></div>`;
+        ${item.wavKept ? '<button class="btn" id="remaster">Re-master</button>' +
+          '<button class="btn" id="purge">Purge source audio</button>' : ''}
+        <button class="btn" id="del">Delete</button></div>
+      ${item.wavKept ? '<div class="muted" style="margin-top:8px;font-size:12px">Source audio kept — you can re-master instantly. Purge to reclaim disk space.</div>' : ''}`;
     document.getElementById("back").onclick = () => this.render();
     Player.mount(document.getElementById("playerwrap"), item);
     document.getElementById("del").onclick = async () => {
@@ -38,5 +41,16 @@ const Library = {
       await T2A.api(`/api/library/${id}/retag`, { method: "POST",
         headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title, author }) });
       T2A.toast("Updated"); this.detail(id); };
+    if (item.wavKept) {
+      document.getElementById("remaster").onclick = async () => {
+        T2A.toast("Re-mastering…");
+        await T2A.api(`/api/library/${id}/remaster`, { method: "POST",
+          headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) });
+        T2A.toast("Re-mastered"); this.detail(id); };
+      document.getElementById("purge").onclick = async () => {
+        if (!confirm("Delete the source WAVs? You won't be able to re-master without re-rendering.")) return;
+        await T2A.api(`/api/library/${id}/purge-wav`, { method: "POST" });
+        T2A.toast("Source audio purged"); this.detail(id); };
+    }
   },
 };
