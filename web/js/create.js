@@ -62,7 +62,7 @@ const Create = {
     const fl = document.getElementById("fl");
     fl.innerHTML = T2A.state.files.map((f, i) =>
       `<div class="filerow" draggable="true" data-i="${i}">
-         <span class="grip">⋮⋮</span><span class="nm">${f.name}</span>
+         <span class="grip">⋮⋮</span><span class="nm">${T2A.esc(f.name)}</span>
          <span class="wc">${Math.round(f.size / 6)}w</span>
          <button class="x" data-x="${i}">✕</button></div>`).join("");
     fl.querySelectorAll(".x").forEach(b => b.onclick = () => {
@@ -97,7 +97,7 @@ const Create = {
       document.getElementById("chcount").textContent = `· ${data.chapters.length}`;
       chaps.innerHTML = data.chapters.map(c =>
         `<div class="chapline"><span class="ci">${c.index + 1}</span>
-         <span class="ct">${c.title}</span><span class="cc">${c.chars.toLocaleString()} chars</span></div>`).join("");
+         <span class="ct">${T2A.esc(c.title)}</span><span class="cc">${c.chars.toLocaleString()} chars</span></div>`).join("");
     } catch (e) { T2A.toast("Ingest failed"); }
   },
 
