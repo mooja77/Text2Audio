@@ -10,8 +10,13 @@ class PronunciationStore:
     def get_all(self) -> dict:
         if not os.path.isfile(self.path):
             return {}
-        with open(self.path, "r", encoding="utf-8") as f:
-            return json.load(f)
+        try:
+            with open(self.path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except (json.JSONDecodeError, OSError):
+            # Self-heal: this is on the render hot path. A corrupt/unreadable
+            # file should not 500 every render or block rule editing.
+            return {}
 
     def _save(self, data: dict) -> None:
         os.makedirs(os.path.dirname(os.path.abspath(self.path)), exist_ok=True)
