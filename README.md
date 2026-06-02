@@ -62,6 +62,25 @@ lines. If it finds none, the whole book becomes one chapter.
 Built-in Kokoro narrators (American `af_*`/`am_*`, British `bf_*`/`bm_*`).
 `af_heart` is a great default. Use **Preview voice** to audition.
 
+## Voice cloning (optional)
+
+Narrate in a cloned voice via F5-TTS. It's a heavy, optional engine — Kokoro stays
+the fast default, and cloning runs in an isolated subprocess.
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install f5-tts
+# IMPORTANT: f5-tts may pull a mismatched torchaudio. Re-pin it to match torch:
+.\.venv\Scripts\python.exe -m pip install "torchaudio==2.6.0" --index-url https://download.pytorch.org/whl/cu124
+```
+
+Then in the **Voices** tab → **Clone a voice**: give it a name, upload ~10–30s of
+clean speech, and (optionally) paste a transcript of the clip for best quality.
+The cloned voice appears alongside the built-ins and can be selected in **Create**.
+Cloned renders are higher quality but much slower than Kokoro — use **▶ Sample** to
+audition before committing to a full book.
+
+GPU cloning test is opt-in: `$env:RUN_F5=1; pytest tests/test_clone_synth.py`.
+
 ## Tests
 
 ```powershell
