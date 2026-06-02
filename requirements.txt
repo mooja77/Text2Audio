@@ -9,3 +9,4 @@ python-multipart>=0.0.9
 aiofiles>=23.0
 httpx>=0.27
 num2words>=0.5.13
+f5-tts>=1.1  # optional: only needed for voice cloning (heavy GPU dependency)
