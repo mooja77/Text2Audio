@@ -80,3 +80,43 @@ def test_render_job_streams_done_and_creates_library_entry(client, monkeypatch):
     detail = client.get(f"/api/library/{lib_id}")  # added in Task 9; if 404 here, run after Task 9
     # The library entry exists on disk regardless of the detail route:
     assert server.library.get(lib_id)["title"] == "Streamed"
+
+
+def _make_one(client, server, monkeypatch, title="LibBook"):
+    monkeypatch.setattr(server, "SYNTH_FACTORY", _FakeSynth)
+    book = "## Chapter 1 - One\nChapter 1. One.\n\nHi."
+    job = client.post("/api/render", json={"bookText": book, "voice": "af_heart",
+                                           "speed": 1.0, "title": title, "author": "A"}).json()["jobId"]
+    with client.stream("GET", f"/api/render/{job}/stream") as resp:
+        for line in resp.iter_lines():
+            if line.startswith("data:") and '"done"' in line:
+                break
+    return job
+
+
+def test_library_list_and_detail(client, monkeypatch):
+    import server
+    jid = _make_one(client, server, monkeypatch, "DetailBook")
+    lst = client.get("/api/library").json()
+    assert any(m["id"] == jid for m in lst)
+    detail = client.get(f"/api/library/{jid}").json()
+    assert detail["title"] == "DetailBook" and len(detail["chapters"]) == 1
+
+
+def test_audio_supports_range(client, monkeypatch):
+    import server
+    jid = _make_one(client, server, monkeypatch)
+    full = client.get(f"/api/audio/{jid}")
+    assert full.status_code == 200 and int(full.headers["content-length"]) > 0
+    part = client.get(f"/api/audio/{jid}", headers={"Range": "bytes=0-99"})
+    assert part.status_code == 206 and part.headers["content-range"].startswith("bytes 0-99/")
+
+
+def test_retag_and_delete(client, monkeypatch):
+    import server
+    jid = _make_one(client, server, monkeypatch)
+    r = client.post(f"/api/library/{jid}/retag", json={"title": "New Title", "author": "New Author"})
+    assert r.status_code == 200
+    assert client.get(f"/api/library/{jid}").json()["title"] == "New Title"
+    assert client.delete(f"/api/library/{jid}").status_code == 200
+    assert client.get(f"/api/library/{jid}").status_code == 404
