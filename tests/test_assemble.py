@@ -88,3 +88,15 @@ def test_build_m4b_master_false_omits_filters(tmp_path, monkeypatch):
     cmd = captured["cmd"]
     assert "-af" not in cmd
     assert "96k" in cmd
+
+
+@pytest.mark.skipif(not _HAS_FFMPEG, reason="ffmpeg/ffprobe not installed")
+def test_build_m4b_master_true_survives_pure_silence(tmp_path):
+    # loudnorm NaN on silence must not crash: fall back to a valid unmastered file.
+    wav = str(tmp_path / "silent.wav")
+    write_wav(np.zeros(SAMPLE_RATE, dtype=np.float32), wav)
+    out = str(tmp_path / "silent.m4b")
+    build_m4b([("C1", wav)], out, master=True)
+    probe = subprocess.run(["ffprobe", "-print_format", "json", "-show_chapters", out],
+                           capture_output=True, text=True, check=True)
+    assert len(json.loads(probe.stdout)["chapters"]) == 1
