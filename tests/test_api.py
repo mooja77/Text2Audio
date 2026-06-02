@@ -120,3 +120,12 @@ def test_retag_and_delete(client, monkeypatch):
     assert client.get(f"/api/library/{jid}").json()["title"] == "New Title"
     assert client.delete(f"/api/library/{jid}").status_code == 200
     assert client.get(f"/api/library/{jid}").status_code == 404
+
+
+def test_voice_preview_returns_wav(client, monkeypatch):
+    import server
+    monkeypatch.setattr(server, "SYNTH_FACTORY", _FakeSynth)
+    r = client.post("/api/voice-preview", json={"voice": "bm_george"})
+    assert r.status_code == 200
+    assert r.headers["content-type"] == "audio/wav"
+    assert len(r.content) > 44  # more than a bare WAV header
