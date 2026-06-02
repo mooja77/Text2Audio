@@ -26,15 +26,21 @@ setx PHONEMIZER_ESPEAK_LIBRARY "C:\Program Files\eSpeak NG\libespeak-ng.dll"
 setx PHONEMIZER_ESPEAK_PATH "C:\Program Files\eSpeak NG\espeak-ng.exe"
 ```
 
-## Run
+## Run (Studio UI)
 
 ```powershell
-python app.py
+.\.venv\Scripts\python.exe server.py
 ```
 
-Your browser opens the app. Upload a `.txt` book, pick a voice, optionally set
-title/author/cover, click **Detect chapters** to confirm the split, then
-**Generate Audiobook**. The finished `.m4b` lands in `output/`.
+Opens the Text2Audio Studio in your browser. **Create** tab: drag in `.md`/`.txt`
+chapter files (Markdown is auto-cleaned, one file per chapter), set
+title/voice/speed, and Generate — live per-chapter progress streams as it
+renders. **Voices** tab: audition any narrator. **Library** tab: every finished
+audiobook with an in-app chapter player, retag, and delete. Finished books are
+saved under `library/<id>/book.m4b`.
+
+The classic single-screen Gradio UI is still available via `python app.py`
+(upload one `.txt`, **Detect chapters**, **Generate Audiobook** → `output/`).
 
 ## Chapter markers
 
