@@ -209,3 +209,32 @@ def test_purge_endpoint_flips_flags_and_blocks_remaster(client, monkeypatch):
 
 def test_remaster_bad_id_404(client):
     assert client.post("/api/library/not-hex-id/remaster").status_code == 404
+
+
+def test_pronunciations_crud(client):
+    base = client.get("/api/pronunciations").json()
+    assert "builtin" in base and "custom" in base
+    assert base["custom"] == {}
+    r = client.put("/api/pronunciations/Carrigaline", json={"sayAs": "Carrig a line"})
+    assert r.status_code == 200 and r.json()["custom"]["carrigaline"] == "Carrig a line"
+    d = client.request("DELETE", "/api/pronunciations/carrigaline")
+    assert d.status_code == 200 and d.json()["custom"] == {}
+
+
+def test_pronunciation_put_rejects_empty(client):
+    assert client.put("/api/pronunciations/x", json={"sayAs": "  "}).status_code == 400
+
+
+def test_normalize_preview(client):
+    r = client.post("/api/normalize-preview", json={"text": "Mr Smith in 1801"})
+    assert r.status_code == 200
+    out = r.json()["normalized"]
+    assert "Mister" in out and "eighteen oh-one" in out
+
+
+def test_render_uses_custom_pronunciations(client, monkeypatch):
+    import server
+    monkeypatch.setattr(server, "SYNTH_FACTORY", _FakeSynth)
+    server.pron.set_rule("foo", "bar")
+    r = client.post("/api/render", json={"bookText": "## A\n\nThe foo.", "voice": "af_heart", "title": "P"})
+    assert r.status_code == 200

@@ -18,6 +18,7 @@ const T2A = {
     if (name === "voices") Voices.render();
     if (name === "library") Library.render();
     if (name === "create") Create.render();
+    if (name === "pronounce") Pronounce.render();
   },
 };
 
