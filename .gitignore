@@ -6,3 +6,4 @@ output/
 *.wav
 *.m4b
 *.mp3
+.superpowers/
