@@ -7,6 +7,9 @@ import soundfile as sf
 
 from pipeline.synth import SAMPLE_RATE
 
+DEFAULT_BITRATE = "128k"
+MASTER_FILTERS = "highpass=f=80,loudnorm=I=-19:TP=-2:LRA=11"
+
 
 def write_wav(audio, path: str, sample_rate: int = SAMPLE_RATE) -> str:
     sf.write(path, audio, sample_rate)
@@ -41,7 +44,8 @@ def _build_ffmetadata(titles, durations_ms, book_title=None, author=None) -> str
 
 
 def build_m4b(chapter_wavs, output_path: str, book_title=None, author=None,
-              cover=None, ffmpeg: str = "ffmpeg") -> str:
+              cover=None, ffmpeg: str = "ffmpeg", master: bool = True,
+              bitrate: str = DEFAULT_BITRATE) -> str:
     if shutil.which(ffmpeg) is None:
         raise RuntimeError(
             f"'{ffmpeg}' not found. Install ffmpeg and ensure it is on PATH "
@@ -69,10 +73,21 @@ def build_m4b(chapter_wavs, output_path: str, book_title=None, author=None,
     cmd += ["-map", "0:a", "-map_metadata", "1"]
     if cover:
         cmd += ["-map", "2:v", "-disposition:v", "attached_pic", "-c:v", "mjpeg"]
-    cmd += ["-c:a", "aac", "-b:a", "64k", output_path]
+    if master:
+        cmd += ["-af", MASTER_FILTERS]
+    cmd += ["-c:a", "aac", "-b:a", bitrate, output_path]
 
     try:
-        subprocess.run(cmd, check=True, capture_output=True, text=True)
+        try:
+            subprocess.run(cmd, check=True, capture_output=True, text=True)
+        except subprocess.CalledProcessError:
+            # loudnorm produces NaN gain on (near-)silent audio, which the AAC
+            # encoder rejects. Fall back to an unmastered encode so a render of
+            # mostly-silent content still produces a valid file rather than crashing.
+            if not master:
+                raise
+            fallback = [a for a in cmd if a not in ("-af", MASTER_FILTERS)]
+            subprocess.run(fallback, check=True, capture_output=True, text=True)
     finally:
         for tmp in (concat_path, meta_path):
             if os.path.exists(tmp):
