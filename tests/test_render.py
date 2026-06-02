@@ -89,3 +89,22 @@ def test_purge_then_remaster_raises(tmp_path):
     import pytest
     with pytest.raises(Exception):
         remaster(lib, "j3")
+
+
+def test_render_applies_custom_pronunciations(tmp_path):
+    lib = Library(str(tmp_path))
+    seen = []
+
+    class SpySynth(FakeSynth):
+        def synth_paragraphs(self, paragraphs, progress=None):
+            for para in paragraphs:
+                seen.extend(para)
+            return super().synth_paragraphs(paragraphs)
+
+    book = "## Chapter 1 - One\nThe foo sailed in 1801."
+    render_audiobook(book_text=book, voice="af_heart", speed=1.0, title="T", author="",
+                     cover_path=None, library=lib, job_id="jn", emit=lambda e: None,
+                     synth_factory=SpySynth, custom_rules={"foo": "bar"})
+    joined = " ".join(seen)
+    assert "bar" in joined and "foo" not in joined
+    assert "eighteen oh-one" in joined  # built-in number expansion also ran
