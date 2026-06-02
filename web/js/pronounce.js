@@ -1,6 +1,3 @@
-const _esc = s => String(s).replace(/[&<>"']/g,
-  c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-
 const Pronounce = {
   async render() {
     const el = document.getElementById("tab-pronounce");
@@ -42,7 +39,7 @@ const Pronounce = {
     const cwrap = document.getElementById("pcustom");
     const entries = Object.entries(d.custom);
     cwrap.innerHTML = entries.length ? entries.map(([w, s]) =>
-      `<div class="filerow"><span class="nm">${_esc(w)} → ${_esc(s)}</span><button class="x" data-w="${_esc(w)}">✕</button></div>`).join("")
+      `<div class="filerow"><span class="nm">${T2A.esc(w)} → ${T2A.esc(s)}</span><button class="x" data-w="${T2A.esc(w)}">✕</button></div>`).join("")
       : `<span class="muted">No custom rules yet — add one above.</span>`;
     cwrap.querySelectorAll(".x").forEach(b => b.onclick = async () => {
       await T2A.api(`/api/pronunciations/${encodeURIComponent(b.dataset.w)}`, { method: "DELETE" });
