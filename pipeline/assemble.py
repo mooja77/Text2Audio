@@ -78,7 +78,16 @@ def build_m4b(chapter_wavs, output_path: str, book_title=None, author=None,
     cmd += ["-c:a", "aac", "-b:a", bitrate, output_path]
 
     try:
-        subprocess.run(cmd, check=True, capture_output=True, text=True)
+        try:
+            subprocess.run(cmd, check=True, capture_output=True, text=True)
+        except subprocess.CalledProcessError:
+            # loudnorm produces NaN gain on (near-)silent audio, which the AAC
+            # encoder rejects. Fall back to an unmastered encode so a render of
+            # mostly-silent content still produces a valid file rather than crashing.
+            if not master:
+                raise
+            fallback = [a for a in cmd if a not in ("-af", MASTER_FILTERS)]
+            subprocess.run(fallback, check=True, capture_output=True, text=True)
     finally:
         for tmp in (concat_path, meta_path):
             if os.path.exists(tmp):
