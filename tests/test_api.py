@@ -29,3 +29,16 @@ def test_voices_listed(client):
 def test_index_served(client):
     r = client.get("/")
     assert r.status_code == 200 and "Text2Audio" in r.text
+
+
+def test_ingest_returns_chapters(client):
+    files = [
+        ("files", ("Chapter01_A.md", b"# Chapter 1 - Alpha\n\nFirst body.", "text/markdown")),
+        ("files", ("Chapter02_B.md", b"# Chapter 2 - Beta\n\nSecond body.", "text/markdown")),
+    ]
+    r = client.post("/api/ingest", files=files)
+    assert r.status_code == 200
+    data = r.json()
+    assert [c["title"] for c in data["chapters"]] == ["Chapter 1 - Alpha", "Chapter 2 - Beta"]
+    assert data["chapters"][0]["chars"] > 0
+    assert "bookText" in data and "## Chapter 1 - Alpha" in data["bookText"]

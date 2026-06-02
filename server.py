@@ -7,13 +7,15 @@ import webbrowser
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, File, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from pipeline.synth import Synthesizer, PRESET_VOICES
 from backend.library import Library
 from backend.jobs import JobManager
+from pipeline.ingest import build_book_text
+from pipeline.parse import parse_chapters
 
 ROOT = Path(__file__).parent
 WEB_DIR = ROOT / "web"
@@ -64,6 +66,21 @@ def get_voices():
 @app.get("/")
 def index():
     return FileResponse(WEB_DIR / "index.html")
+
+
+@app.post("/api/ingest")
+async def ingest(files: list[UploadFile] = File(...)):
+    sources = []
+    for f in files:
+        raw = (await f.read()).decode("utf-8", errors="replace")
+        sources.append((f.filename or "untitled.txt", raw))
+    book_text = build_book_text(sources)
+    chapters = parse_chapters(book_text)
+    return {
+        "bookText": book_text,
+        "chapters": [{"index": i, "title": c.title, "chars": len(c.text)}
+                     for i, c in enumerate(chapters)],
+    }
 
 
 # IMPORTANT: keep this static mount as the LAST route registration in the file.
