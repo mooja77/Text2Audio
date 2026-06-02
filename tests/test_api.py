@@ -168,3 +168,20 @@ def test_second_render_rejected_while_busy(client, monkeypatch):
         for line in resp.iter_lines():
             if line.startswith("data:") and ('"done"' in line or '"error"' in line):
                 break
+
+
+def test_render_ignores_client_supplied_cover_path(client, monkeypatch):
+    # A client-supplied filesystem path must never be read/copied by the server.
+    import server
+    monkeypatch.setattr(server, "SYNTH_FACTORY", _FakeSynth)
+    book = "## Chapter 1 - One\nChapter 1. One.\n\nHi."
+    r = client.post("/api/render", json={"bookText": book, "voice": "af_heart",
+                                         "title": "NoCover", "coverPath": "C:/Windows/win.ini"})
+    assert r.status_code == 200
+    jid = r.json()["jobId"]
+    with client.stream("GET", f"/api/render/{jid}/stream") as resp:
+        for line in resp.iter_lines():
+            if line.startswith("data:") and '"done"' in line:
+                break
+    assert server.library.get(jid)["coverFile"] is None
+    assert client.get(f"/api/cover/{jid}").status_code == 404

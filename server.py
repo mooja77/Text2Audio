@@ -55,7 +55,8 @@ class RenderRequest(BaseModel):
     speed: float = 1.0
     title: str = ""
     author: str = ""
-    coverPath: str | None = None
+    # NOTE: no client-supplied filesystem path here. A cover would be uploaded as
+    # bytes via multipart and validated before saving — never a server-side path.
 
 
 def voices_payload() -> list[dict]:
@@ -120,7 +121,7 @@ def start_render(req: RenderRequest):
     def target(emit):
         try:
             render_audiobook(book_text=req.bookText, voice=req.voice, speed=req.speed,
-                             title=req.title, author=req.author, cover_path=req.coverPath,
+                             title=req.title, author=req.author, cover_path=None,
                              library=library, job_id=job_id, emit=emit,
                              synth_factory=SYNTH_FACTORY)
         finally:
