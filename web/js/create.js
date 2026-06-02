@@ -1,8 +1,10 @@
 const Create = {
   render() {
     const el = document.getElementById("tab-create");
-    const voiceOpts = T2A.state.voices.map(v =>
-      `<option value="${v.id}" ${v.id === T2A.state.voice ? "selected" : ""}>${v.label} · ${v.accent} ${v.gender}</option>`).join("");
+    const opt = v => `<option value="${T2A.esc(v.id)}" ${v.id === T2A.state.voice ? "selected" : ""}>${T2A.esc(v.label)}${v.kind === "cloned" ? " (cloned)" : ` · ${T2A.esc(v.accent)} ${T2A.esc(v.gender)}`}</option>`;
+    const presets = T2A.state.voices.filter(v => v.kind !== "cloned").map(opt).join("");
+    const cloned = T2A.state.voices.filter(v => v.kind === "cloned").map(opt).join("");
+    const voiceOpts = presets + (cloned ? `<optgroup label="Your voices">${cloned}</optgroup>` : "");
     el.innerHTML = `
       <h2>Create audiobook</h2>
       <p class="subtitle">Drop in your chapter files (.md or .txt), set options, and generate.</p>
