@@ -38,3 +38,14 @@ def chunk_text(text: str, max_chars: int = 400) -> list[str]:
     if current:
         chunks.append(current)
     return chunks
+
+
+def chunk_paragraphs(text: str, max_chars: int = 400) -> list[list[str]]:
+    """Split text into paragraphs (on blank lines), each a list of sentence chunks."""
+    paragraphs = re.split(r"\n\s*\n", text)
+    out = []
+    for para in paragraphs:
+        chunks = chunk_text(para, max_chars=max_chars)
+        if chunks:
+            out.append(chunks)
+    return out
