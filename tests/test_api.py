@@ -129,3 +129,42 @@ def test_voice_preview_returns_wav(client, monkeypatch):
     assert r.status_code == 200
     assert r.headers["content-type"] == "audio/wav"
     assert len(r.content) > 44  # more than a bare WAV header
+
+
+def test_unknown_voice_render_returns_400(client):
+    r = client.post("/api/render", json={"bookText": "## A\n\nhi", "voice": "nope"})
+    assert r.status_code == 400
+
+
+def test_invalid_library_id_rejected(client):
+    # Non-hex ids never reach the filesystem (path-traversal defense) -> 404.
+    assert client.get("/api/library/not-a-valid-id").status_code == 404
+    assert client.get("/api/audio/zzzznothex").status_code == 404
+    assert client.delete("/api/library/nothexid").status_code == 404
+
+
+def test_second_render_rejected_while_busy(client, monkeypatch):
+    import threading
+    import server
+
+    gate = threading.Event()
+
+    class _BlockingSynth:
+        def __init__(self, voice, lang_code, speed=1.0):
+            pass
+        def synth_chunks(self, chunks, progress=None):
+            gate.wait(timeout=5)
+            return np.zeros(int(0.1 * SAMPLE_RATE), dtype=np.float32)
+
+    monkeypatch.setattr(server, "SYNTH_FACTORY", _BlockingSynth)
+    book = "## Chapter 1 - One\nChapter 1. One.\n\nHi."
+    r1 = client.post("/api/render", json={"bookText": book, "voice": "af_heart", "title": "A"})
+    assert r1.status_code == 200
+    # second render while the first holds the GPU lock -> 409
+    r2 = client.post("/api/render", json={"bookText": book, "voice": "af_heart", "title": "B"})
+    assert r2.status_code == 409
+    gate.set()  # let the first render finish (releases the lock)
+    with client.stream("GET", f"/api/render/{r1.json()['jobId']}/stream") as resp:
+        for line in resp.iter_lines():
+            if line.startswith("data:") and ('"done"' in line or '"error"' in line):
+                break

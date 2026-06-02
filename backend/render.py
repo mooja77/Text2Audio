@@ -16,6 +16,19 @@ def render_audiobook(*, book_text, voice, speed, title, author, cover_path,
                      library, job_id, emit, synth_factory=Synthesizer) -> dict:
     chapters = parse_chapters(book_text, default_title=title or "Audiobook")
     workdir = library.new_dir(job_id)
+    try:
+        return _render_into(workdir, chapters, voice=voice, speed=speed, title=title,
+                            author=author, cover_path=cover_path, library=library,
+                            job_id=job_id, emit=emit, synth_factory=synth_factory)
+    except Exception:
+        # A render that fails partway leaves orphan WAVs and no manifest; remove
+        # the whole workspace so failed runs don't accumulate junk on disk.
+        shutil.rmtree(workdir, ignore_errors=True)
+        raise
+
+
+def _render_into(workdir, chapters, *, voice, speed, title, author, cover_path,
+                 library, job_id, emit, synth_factory) -> dict:
     synth = synth_factory(voice=voice, lang_code=PRESET_VOICES[voice], speed=float(speed))
 
     n = len(chapters)
