@@ -58,16 +58,22 @@ def _render_into(workdir, chapters, *, voice, speed, title, author, cover_path,
     n = len(chapters)
     chapter_wavs = []
     wav_files = []
-    for i, ch in enumerate(chapters):
-        emit({"type": "progress", "chapterIndex": i, "chapterCount": n,
-              "chapterTitle": ch.title, "percent": round(i / max(1, n) * 100)})
-        audio = synth.synth_paragraphs(chunk_paragraphs(normalize_text(ch.text, custom_rules)))
-        if len(audio) == 0:
-            audio = np.zeros(int(0.5 * SAMPLE_RATE), dtype=np.float32)
-        rel = os.path.join(WAV_SUBDIR, f"chapter_{i + 1:03d}.wav")
-        write_wav(audio, os.path.join(workdir, rel))
-        chapter_wavs.append((ch.title, os.path.join(workdir, rel)))
-        wav_files.append(rel)
+    try:
+        for i, ch in enumerate(chapters):
+            emit({"type": "progress", "chapterIndex": i, "chapterCount": n,
+                  "chapterTitle": ch.title, "percent": round(i / max(1, n) * 100)})
+            audio = synth.synth_paragraphs(chunk_paragraphs(normalize_text(ch.text, custom_rules)))
+            if len(audio) == 0:
+                audio = np.zeros(int(0.5 * SAMPLE_RATE), dtype=np.float32)
+            rel = os.path.join(WAV_SUBDIR, f"chapter_{i + 1:03d}.wav")
+            write_wav(audio, os.path.join(workdir, rel))
+            chapter_wavs.append((ch.title, os.path.join(workdir, rel)))
+            wav_files.append(rel)
+    finally:
+        # Deterministically tear down the synthesizer (e.g. the F5 subprocess)
+        # rather than waiting for garbage collection.
+        if hasattr(synth, "close"):
+            synth.close()
 
     cover_dest = None
     if cover_path:

@@ -5,6 +5,13 @@ SAMPLE_RATE = 24000
 SENTENCE_GAP = 0.15
 PARAGRAPH_GAP = 0.6
 
+
+class FatalSynthError(Exception):
+    """An unrecoverable synthesis failure (e.g. the cloning worker died).
+
+    The per-chunk retry/skip logic deliberately does NOT swallow this — it aborts
+    the render so the failure is surfaced rather than yielding a silent book."""
+
 # voice_id -> lang_code (lang_code must match the voice's language prefix).
 PRESET_VOICES: dict[str, str] = {
     # American English — female
@@ -45,6 +52,8 @@ class BaseSynthesizer:
                 try:
                     audio = self.synth_chunk(chunk)
                     break
+                except FatalSynthError:
+                    raise
                 except Exception:
                     audio = None
             if audio is not None and len(audio) > 0:
@@ -65,6 +74,8 @@ class BaseSynthesizer:
                     try:
                         audio = self.synth_chunk(chunk)
                         break
+                    except FatalSynthError:
+                        raise
                     except Exception:
                         audio = None
                 if audio is not None and len(audio) > 0:

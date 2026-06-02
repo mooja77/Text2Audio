@@ -2,12 +2,17 @@
 import datetime
 import json
 import os
+import re
 import shutil
 import subprocess
 import uuid
 
 SAMPLE_NAME = "sample.wav"
 META_NAME = "meta.json"
+
+# Voice ids are generated as "v" + 9 hex chars. Validate any client-supplied id
+# before it touches the filesystem (defends rmtree / arbitrary reads).
+_VALID_ID = re.compile(r"^v[0-9a-f]{9}$")
 
 
 def new_voice_id() -> str:
@@ -26,6 +31,8 @@ class VoiceStore:
         return os.path.join(self._dir(id), SAMPLE_NAME)
 
     def get(self, id: str) -> dict | None:
+        if not _VALID_ID.match(id):
+            return None
         p = os.path.join(self._dir(id), META_NAME)
         if not os.path.isfile(p):
             return None
@@ -43,6 +50,8 @@ class VoiceStore:
         return items
 
     def delete(self, id: str) -> None:
+        if not _VALID_ID.match(id):
+            return
         shutil.rmtree(self._dir(id), ignore_errors=True)
 
     def create(self, name: str, audio_bytes: bytes, src_ext: str, ref_text: str = "") -> dict:
