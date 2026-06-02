@@ -1,2 +1,32 @@
-<!doctype html><html><head><meta charset="utf-8"><title>Text2Audio</title></head>
-<body><h1>Text2Audio</h1></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Text2Audio Studio</title>
+  <link rel="stylesheet" href="/css/studio.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">🎧 Text2Audio <span>Studio</span></div>
+    <nav class="tabs">
+      <button class="tab" data-tab="library">Library</button>
+      <button class="tab active" data-tab="create">Create</button>
+      <button class="tab" data-tab="voices">Voices</button>
+    </nav>
+    <div id="ffmpeg-warn" class="warn" hidden>⚠ ffmpeg not found</div>
+  </header>
+
+  <main>
+    <section id="tab-create" class="tabpane active"></section>
+    <section id="tab-voices" class="tabpane"></section>
+    <section id="tab-library" class="tabpane"></section>
+  </main>
+
+  <script src="/js/app.js"></script>
+  <script src="/js/create.js"></script>
+  <script src="/js/voices.js"></script>
+  <script src="/js/library.js"></script>
+  <script src="/js/player.js"></script>
+</body>
+</html>
