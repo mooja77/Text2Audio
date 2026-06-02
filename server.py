@@ -19,7 +19,7 @@ from pydantic import BaseModel
 from pipeline.synth import Synthesizer, PRESET_VOICES, SAMPLE_RATE
 from backend.library import Library, new_id
 from backend.jobs import JobManager
-from backend.render import render_audiobook
+from backend.render import render_audiobook, remaster, purge_wavs
 from pipeline.ingest import build_book_text
 from pipeline.parse import parse_chapters
 
@@ -174,6 +174,11 @@ class RetagRequest(BaseModel):
     author: str | None = None
 
 
+class RemasterRequest(BaseModel):
+    bitrate: str = "128k"
+    master: bool = True
+
+
 @app.post("/api/library/{id}/retag")
 def library_retag(id: str, req: RetagRequest):
     _check_id(id)
@@ -216,6 +221,26 @@ def voice_preview(req: PreviewRequest):
     buf = io.BytesIO()
     sf.write(buf, audio, SAMPLE_RATE, format="WAV")
     return Response(content=buf.getvalue(), media_type="audio/wav")
+
+
+@app.post("/api/library/{id}/remaster")
+def library_remaster(id: str, req: RemasterRequest = RemasterRequest()):
+    _check_id(id)
+    try:
+        return remaster(library, id, bitrate=req.bitrate, master=req.master)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="not found")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/api/library/{id}/purge-wav")
+def library_purge(id: str):
+    _check_id(id)
+    try:
+        return purge_wavs(library, id)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="not found")
 
 
 # IMPORTANT: keep this static mount as the LAST route registration in the file.

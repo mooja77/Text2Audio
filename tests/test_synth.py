@@ -45,3 +45,30 @@ def test_synthesizer_smoke():
     audio = synth.synth_chunk("Hello, this is a test.")
     assert isinstance(audio, np.ndarray)
     assert audio.shape[0] > SAMPLE_RATE // 4  # at least ~0.25s of audio
+
+
+from pipeline.synth import SENTENCE_GAP, PARAGRAPH_GAP
+
+
+def test_gap_constants():
+    assert SENTENCE_GAP == 0.15 and PARAGRAPH_GAP == 0.6
+
+
+def test_synth_paragraphs_uses_variable_gaps(monkeypatch):
+    from pipeline.synth import Synthesizer
+
+    # Build a Synthesizer without importing kokoro: bypass __init__.
+    synth = Synthesizer.__new__(Synthesizer)
+    synth.voice, synth.speed = "x", 1.0
+    # one fixed 1000-sample clip per chunk
+    monkeypatch.setattr(synth, "synth_chunk", lambda text: np.ones(1000, dtype=np.float32))
+
+    # two paragraphs, one chunk each -> clipA + PARAGRAPH_GAP + clipB
+    out = synth.synth_paragraphs([["a"], ["b"]])
+    expected = 1000 + int(PARAGRAPH_GAP * SAMPLE_RATE) + 1000
+    assert out.shape[0] == expected
+
+    # one paragraph, two chunks -> clip + SENTENCE_GAP + clip
+    out2 = synth.synth_paragraphs([["a", "b"]])
+    expected2 = 1000 + int(SENTENCE_GAP * SAMPLE_RATE) + 1000
+    assert out2.shape[0] == expected2

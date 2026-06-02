@@ -2,6 +2,8 @@
 import numpy as np
 
 SAMPLE_RATE = 24000
+SENTENCE_GAP = 0.15
+PARAGRAPH_GAP = 0.6
 
 # voice_id -> lang_code (lang_code must match the voice's language prefix).
 PRESET_VOICES: dict[str, str] = {
@@ -56,6 +58,30 @@ class Synthesizer:
             if progress is not None:
                 progress(i + 1, len(chunks))
         return concat_with_gaps(out, gap_seconds=0.3)
+
+    def synth_paragraphs(self, paragraphs, progress=None) -> np.ndarray:
+        total = sum(len(p) for p in paragraphs)
+        done = 0
+        para_audios = []
+        for para in paragraphs:
+            chunk_audios = []
+            for chunk in para:
+                audio = None
+                for _attempt in range(2):  # one retry
+                    try:
+                        audio = self.synth_chunk(chunk)
+                        break
+                    except Exception:
+                        audio = None
+                if audio is not None and len(audio) > 0:
+                    chunk_audios.append(audio)
+                done += 1
+                if progress is not None:
+                    progress(done, total)
+            joined = concat_with_gaps(chunk_audios, gap_seconds=SENTENCE_GAP)
+            if len(joined) > 0:
+                para_audios.append(joined)
+        return concat_with_gaps(para_audios, gap_seconds=PARAGRAPH_GAP)
 
     def preview(self, text: str = "This is a sample of the selected narrator voice.") -> np.ndarray:
         return self.synth_chunk(text)

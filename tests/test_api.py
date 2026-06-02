@@ -54,6 +54,9 @@ class _FakeSynth:
         pass
     def synth_chunks(self, chunks, progress=None):
         return np.zeros(int(0.1 * SAMPLE_RATE), dtype=np.float32)
+    def synth_paragraphs(self, paragraphs, progress=None):
+        n = sum(len(p) for p in paragraphs)
+        return np.zeros(int(0.1 * SAMPLE_RATE) * max(1, n), dtype=np.float32)
 
 
 def test_render_job_streams_done_and_creates_library_entry(client, monkeypatch):
@@ -185,3 +188,24 @@ def test_render_ignores_client_supplied_cover_path(client, monkeypatch):
                 break
     assert server.library.get(jid)["coverFile"] is None
     assert client.get(f"/api/cover/{jid}").status_code == 404
+
+
+def test_remaster_endpoint_updates_manifest(client, monkeypatch):
+    import server
+    jid = _make_one(client, server, monkeypatch, "RemasterMe")
+    r = client.post(f"/api/library/{jid}/remaster", json={"bitrate": "96k"})
+    assert r.status_code == 200
+    assert r.json()["bitrate"] == "96k"
+    assert client.get(f"/api/library/{jid}").json()["bitrate"] == "96k"
+
+
+def test_purge_endpoint_flips_flags_and_blocks_remaster(client, monkeypatch):
+    import server
+    jid = _make_one(client, server, monkeypatch)
+    p = client.post(f"/api/library/{jid}/purge-wav")
+    assert p.status_code == 200 and p.json()["wavKept"] is False
+    assert client.post(f"/api/library/{jid}/remaster").status_code == 400
+
+
+def test_remaster_bad_id_404(client):
+    assert client.post("/api/library/not-hex-id/remaster").status_code == 404
