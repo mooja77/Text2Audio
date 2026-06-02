@@ -244,10 +244,14 @@ def voice_preview(req: PreviewRequest):
     if req.voice not in PRESET_VOICES and voices.get(req.voice) is None:
         raise HTTPException(status_code=400, detail="unknown voice")
     synth = SYNTH_FACTORY(req.voice, 1.0)
-    if hasattr(synth, "preview"):
-        audio = synth.preview(_PREVIEW_TEXT)
-    else:
-        audio = synth.synth_chunks([_PREVIEW_TEXT])
+    try:
+        if hasattr(synth, "preview"):
+            audio = synth.preview(_PREVIEW_TEXT)
+        else:
+            audio = synth.synth_chunks([_PREVIEW_TEXT])
+    finally:
+        if hasattr(synth, "close"):
+            synth.close()
     buf = io.BytesIO()
     sf.write(buf, audio, SAMPLE_RATE, format="WAV")
     return Response(content=buf.getvalue(), media_type="audio/wav")

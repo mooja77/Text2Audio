@@ -12,7 +12,7 @@ import sys
 import numpy as np
 import soundfile as sf
 
-from pipeline.synth import BaseSynthesizer, SAMPLE_RATE
+from pipeline.synth import BaseSynthesizer, FatalSynthError, SAMPLE_RATE
 
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -56,11 +56,15 @@ class ClonedSynthesizer(BaseSynthesizer):
     def synth_chunk(self, text: str) -> np.ndarray:
         req = {"ref": self.ref_wav, "ref_text": self.ref_text,
                "text": text, "speed": self.speed}
-        self._proc.stdin.write(json.dumps(req) + "\n")
-        self._proc.stdin.flush()
-        line = self._proc.stdout.readline()
+        try:
+            self._proc.stdin.write(json.dumps(req) + "\n")
+            self._proc.stdin.flush()
+            line = self._proc.stdout.readline()
+        except OSError as exc:  # broken pipe — worker is gone
+            raise FatalSynthError("f5 worker exited unexpectedly") from exc
         if not line:
-            raise RuntimeError("f5 worker exited unexpectedly")
+            # Worker died: fatal and unrecoverable — abort rather than retry/skip.
+            raise FatalSynthError("f5 worker exited unexpectedly")
         resp = json.loads(line)
         wav, sr = sf.read(resp["wav"], dtype="float32")
         try:

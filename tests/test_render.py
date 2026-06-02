@@ -123,3 +123,39 @@ def test_render_factory_called_with_voice_and_speed(tmp_path):
                      emit=lambda e: None, synth_factory=factory)
     assert seen == {"voice": "my_clone", "speed": 0.9}
     assert lib.get("jf")["voice"] == "my_clone"
+
+
+def test_render_closes_synth(tmp_path):
+    lib = Library(str(tmp_path))
+    closed = {"v": False}
+
+    class ClosingSynth(FakeSynth):
+        def close(self):
+            closed["v"] = True
+
+    render_audiobook(book_text="## A\n\nHi.", voice="x", speed=1.0, title="T", author="",
+                     cover_path=None, library=lib, job_id="jc", emit=lambda e: None,
+                     synth_factory=lambda vid, sp: ClosingSynth(vid, sp))
+    assert closed["v"] is True
+
+
+def test_render_aborts_on_fatal_synth_error(tmp_path):
+    import pytest
+    from pipeline.synth import FatalSynthError
+    lib = Library(str(tmp_path))
+    closed = {"v": False}
+
+    class DeadSynth:
+        def __init__(self, vid, sp=1.0):
+            pass
+        def synth_paragraphs(self, paragraphs, progress=None):
+            raise FatalSynthError("worker died")
+        def close(self):
+            closed["v"] = True
+
+    with pytest.raises(FatalSynthError):
+        render_audiobook(book_text="## A\n\nHi.", voice="x", speed=1.0, title="T", author="",
+                         cover_path=None, library=lib, job_id="jd", emit=lambda e: None,
+                         synth_factory=lambda vid, sp: DeadSynth(vid, sp))
+    assert closed["v"] is True       # closed even on failure (finally)
+    assert lib.get("jd") is None     # partial workdir cleaned up

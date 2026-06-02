@@ -93,3 +93,17 @@ def test_base_synthesizer_provides_paragraph_logic():
 def test_kokoro_synthesizer_is_base_subclass():
     from pipeline.synth import Synthesizer, BaseSynthesizer
     assert issubclass(Synthesizer, BaseSynthesizer)
+
+
+def test_fatal_synth_error_not_swallowed():
+    import pytest
+    from pipeline.synth import BaseSynthesizer, FatalSynthError
+
+    class Boom(BaseSynthesizer):
+        def synth_chunk(self, text):
+            raise FatalSynthError("worker dead")
+
+    with pytest.raises(FatalSynthError):
+        Boom().synth_paragraphs([["a", "b"]])
+    with pytest.raises(FatalSynthError):
+        Boom().synth_chunks(["a"])

@@ -35,3 +35,10 @@ def test_create_rejects_unreadable_audio(tmp_path):
     store = VoiceStore(str(tmp_path / "voices"))
     with pytest.raises(ValueError):
         store.create("Bad", b"not audio at all", ".wav", ref_text="")
+
+
+def test_invalid_id_rejected(tmp_path):
+    store = VoiceStore(str(tmp_path / "voices"))
+    assert store.get("../etc") is None
+    assert store.get("not-a-voice-id") is None
+    store.delete("../etc")  # no-op, no error
