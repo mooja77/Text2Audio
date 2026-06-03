@@ -283,3 +283,8 @@ def test_render_with_cloned_voice(client, monkeypatch):
 
 def test_render_unknown_voice_still_400(client):
     assert client.post("/api/render", json={"bookText": "## A\n\nhi", "voice": "nope"}).status_code == 400
+
+
+def test_server_has_callable_main():
+    import server
+    assert callable(server.main)

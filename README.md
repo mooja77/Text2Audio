@@ -2,6 +2,11 @@
 
 **Turn a book into a natural-sounding, chaptered audiobook — for free, fully on your own machine.**
 
+[![CI](https://github.com/mooja77/Text2Audio/actions/workflows/ci.yml/badge.svg)](https://github.com/mooja77/Text2Audio/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+🔊 **[Hear a sample](assets/sample.mp3)** — a short clip narrated by Text2Audio.
+
 Text2Audio is a local, open-source audiobook studio. Drop in your manuscript
 (`.txt` or Markdown), pick a narrator, and get a mastered `.m4b` audiobook with
 chapter markers — no cloud, no accounts, no per-use cost. It can even **clone a
@@ -15,6 +20,37 @@ It runs entirely offline on your own GPU using open text-to-speech models
 | Create | Voices &amp; cloning | In-app player |
 |:---:|:---:|:---:|
 | ![Create tab](assets/screenshots/create.png) | ![Voices &amp; cloning](assets/screenshots/voices.png) | ![Library player](assets/screenshots/player.png) |
+
+---
+
+## 🚀 Quick start (no terminal needed — Windows)
+
+Don't want to touch a command line? On Windows you can be up and running in three steps:
+
+1. **[Download the project as a ZIP](https://github.com/mooja77/Text2Audio/archive/refs/heads/master.zip)** and unzip it somewhere (for example, your Desktop).
+2. Double-click **`Install Text2Audio.bat`**. It sets everything up for you — Python, the app and its dependencies, ffmpeg, and espeak-ng. The first run takes a while; just let it finish.
+3. Double-click **`Start Text2Audio`** (the installer also adds a shortcut to your Desktop). Your browser opens the Studio — start making audiobooks. Keep the little black window open while you use the app; closing it stops Text2Audio.
+
+> 💡 The first time you generate audio, the voice model (a few hundred MB) downloads automatically. After that, everything runs fully offline.
+>
+> ⚠️ Windows may show a blue **"Windows protected your PC"** SmartScreen box on the `.bat` files — click **More info → Run anyway**. The scripts are plain text you can open and read first. A full walkthrough, voice-cloning setup, and troubleshooting live in **[INSTALL.md](INSTALL.md)**.
+
+### Install with pip (any OS, for technical users)
+
+```bash
+pip install git+https://github.com/mooja77/Text2Audio
+text2audio
+```
+
+Add the optional voice-cloning engine with the `clone` extra:
+
+```bash
+pip install "text2audio[clone] @ git+https://github.com/mooja77/Text2Audio"
+```
+
+You'll still need **ffmpeg** and **espeak-ng** installed on your system, and — for GPU
+speed — a CUDA build of PyTorch (`pip` pulls the CPU build by default). See
+[Setup](#setup) below for the details.
 
 ---
 
@@ -44,6 +80,10 @@ It runs entirely offline on your own GPU using open text-to-speech models
   — phonemizer backend for Kokoro.
 
 ## Setup
+
+> Non-technical user on Windows? Skip this — use the
+> [Quick start](#-quick-start-no-terminal-needed--windows) above and
+> [INSTALL.md](INSTALL.md) instead. The steps below are the manual developer setup.
 
 ```powershell
 git clone https://github.com/mooja77/Text2Audio.git

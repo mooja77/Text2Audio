@@ -332,9 +332,13 @@ def _mount_static():
 _mount_static()
 
 
-if __name__ == "__main__":
+def main():
     import uvicorn
     host, port = "127.0.0.1", 8765
     if os.environ.get("T2A_NO_BROWSER") != "1":
         threading.Timer(0.8, lambda: webbrowser.open(f"http://{host}:{port}")).start()
     uvicorn.run(app, host=host, port=port, log_level="info")
+
+
+if __name__ == "__main__":
+    main()

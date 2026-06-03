@@ -6,6 +6,7 @@ output/
 *.wav
 *.m4b
 *.mp3
+!assets/sample.mp3
 .superpowers/
 library/
 data/

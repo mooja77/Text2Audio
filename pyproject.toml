@@ -1,0 +1,36 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "text2audio"
+version = "1.0.0"
+description = "Free, local, open-source audiobook studio with AI narration and voice cloning."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.10"
+authors = [{ name = "mooja77" }]
+keywords = ["audiobook", "tts", "text-to-speech", "voice-cloning", "kokoro", "f5-tts"]
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn>=0.30",
+    "soundfile>=0.12",
+    "numpy>=1.24",
+    "num2words>=0.5.13",
+    "kokoro>=0.9.4",
+    "python-multipart>=0.0.9",
+    "aiofiles>=23.0",
+]
+
+[project.optional-dependencies]
+clone = ["f5-tts>=1.1"]
+
+[project.urls]
+Homepage = "https://github.com/mooja77/Text2Audio"
+Repository = "https://github.com/mooja77/Text2Audio"
+
+[project.scripts]
+text2audio = "server:main"
+
+[tool.hatch.build.targets.wheel]
+include = ["server.py", "app.py", "md_to_book.py", "pipeline", "backend", "web", "samples", "assets"]
