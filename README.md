@@ -10,6 +10,12 @@ voice** from a short audio sample.
 It runs entirely offline on your own GPU using open text-to-speech models
 (Kokoro-82M by default; F5-TTS for voice cloning).
 
+## Screenshots
+
+| Create | Voices &amp; cloning | In-app player |
+|:---:|:---:|:---:|
+| ![Create tab](assets/screenshots/create.png) | ![Voices &amp; cloning](assets/screenshots/voices.png) | ![Library player](assets/screenshots/player.png) |
+
 ---
 
 ## Features
@@ -55,6 +61,19 @@ If espeak-ng isn't auto-detected, point to it:
 setx PHONEMIZER_ESPEAK_LIBRARY "C:\Program Files\eSpeak NG\libespeak-ng.dll"
 setx PHONEMIZER_ESPEAK_PATH "C:\Program Files\eSpeak NG\espeak-ng.exe"
 ```
+
+### Linux / macOS
+
+The project is plain Python and cross-platform. The commands are the same, except:
+
+- Activate the venv with `source .venv/bin/activate`.
+- Install ffmpeg and espeak-ng from your package manager:
+  - Debian/Ubuntu: `sudo apt install ffmpeg espeak-ng`
+  - macOS (Homebrew): `brew install ffmpeg espeak-ng`
+- Where this README shows `.\.venv\Scripts\python.exe`, use `.venv/bin/python`.
+- Pick the PyTorch index for your platform/accelerator from
+  [pytorch.org](https://pytorch.org/get-started/locally/) (e.g. ROCm on Linux, or
+  the default CPU/MPS build on macOS — note Kokoro/F5 are much faster on CUDA).
 
 ## Run
 
