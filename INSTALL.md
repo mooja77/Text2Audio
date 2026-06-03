@@ -92,15 +92,27 @@ Text2Audio can narrate in a cloned voice using a heavier optional engine called
 1. Open the Text2Audio folder.
 2. Hold **Shift**, right-click an empty area, and choose
    **Open PowerShell window here** (or **Open in Terminal**).
-3. Paste these two lines and press Enter:
+3. Install F5-TTS:
 
    ```powershell
    .\.venv\Scripts\python.exe -m pip install f5-tts
-   .\.venv\Scripts\python.exe -m pip install "torchaudio==2.6.0" --index-url https://download.pytorch.org/whl/cu124
    ```
 
-   (The second line re-pins `torchaudio` so it matches the rest of the app — F5-TTS
-   sometimes pulls a mismatched version.)
+4. Re-pin `torchaudio` so it matches the rest of the app (F5-TTS sometimes pulls a
+   mismatched version). Use the line that matches your machine:
+
+   - **NVIDIA GPU** (the installer set up the CUDA build):
+
+     ```powershell
+     .\.venv\Scripts\python.exe -m pip install "torchaudio==2.6.0" --index-url https://download.pytorch.org/whl/cu124
+     ```
+
+   - **No NVIDIA GPU** (CPU build — leave off the CUDA index, or you'll pull a GPU build
+     onto a CPU-only setup and break it):
+
+     ```powershell
+     .\.venv\Scripts\python.exe -m pip install "torchaudio==2.6.0"
+     ```
 
 Then start the app and go to **Voices → Clone a voice**: give it a name, upload about
 10–30 seconds of clean speech, and optionally paste a transcript of that clip for the

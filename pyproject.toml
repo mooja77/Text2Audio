@@ -33,4 +33,4 @@ Repository = "https://github.com/mooja77/Text2Audio"
 text2audio = "server:main"
 
 [tool.hatch.build.targets.wheel]
-include = ["server.py", "app.py", "md_to_book.py", "pipeline", "backend", "web", "samples"]
+include = ["server.py", "app.py", "md_to_book.py", "pipeline", "backend", "web", "samples", "assets"]
