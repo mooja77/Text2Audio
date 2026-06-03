@@ -33,7 +33,9 @@ Don't want to touch a command line? On Windows you can be up and running in thre
 
 > 💡 The first time you generate audio, the voice model (a few hundred MB) downloads automatically. After that, everything runs fully offline.
 >
-> ⚠️ Windows may show a blue **"Windows protected your PC"** SmartScreen box on the `.bat` files — click **More info → Run anyway**. The scripts are plain text you can open and read first. A full walkthrough, voice-cloning setup, and troubleshooting live in **[INSTALL.md](INSTALL.md)**.
+> ⚠️ Windows may show a blue **"Windows protected your PC"** SmartScreen box on the `.bat` files — click **More info → Run anyway** (see below). The scripts are plain text you can open and read first. A full walkthrough, voice-cloning setup, and troubleshooting live in **[INSTALL.md](INSTALL.md)**.
+
+![Getting past the Windows SmartScreen prompt: click "More info", then "Run anyway"](assets/smartscreen.png)
 
 ### Install with pip (any OS, for technical users)
 

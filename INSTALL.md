@@ -42,9 +42,11 @@ until you see the green **"Done!"** message, then close the window.
 Because these `.bat` files aren't signed by a big company, Windows may show a blue
 **"Windows protected your PC"** box. This is normal for small open-source tools.
 
-- Click **More info**, then **Run anyway**.
+- Click **More info**, then **Run anyway** (see the picture below).
 - The `.bat` files are short, plain-text scripts — you're welcome to open them in
   Notepad first and read exactly what they do.
+
+![How to get past the Windows SmartScreen prompt: click "More info", then "Run anyway"](assets/smartscreen.png)
 
 ### If something needs admin permission
 
