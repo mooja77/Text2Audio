@@ -72,3 +72,38 @@ def test_synth_paragraphs_uses_variable_gaps(monkeypatch):
     out2 = synth.synth_paragraphs([["a", "b"]])
     expected2 = 1000 + int(SENTENCE_GAP * SAMPLE_RATE) + 1000
     assert out2.shape[0] == expected2
+
+
+def test_base_synthesizer_provides_paragraph_logic():
+    from pipeline.synth import BaseSynthesizer
+
+    class Tiny(BaseSynthesizer):
+        def synth_chunk(self, text):
+            return np.ones(100, dtype=np.float32)
+
+    s = Tiny()
+    # one paragraph, two chunks -> 100 + SENTENCE_GAP + 100
+    from pipeline.synth import SENTENCE_GAP
+    out = s.synth_paragraphs([["a", "b"]])
+    assert out.shape[0] == 100 + int(SENTENCE_GAP * SAMPLE_RATE) + 100
+    # preview uses synth_chunk
+    assert s.preview("hi").shape[0] == 100
+
+
+def test_kokoro_synthesizer_is_base_subclass():
+    from pipeline.synth import Synthesizer, BaseSynthesizer
+    assert issubclass(Synthesizer, BaseSynthesizer)
+
+
+def test_fatal_synth_error_not_swallowed():
+    import pytest
+    from pipeline.synth import BaseSynthesizer, FatalSynthError
+
+    class Boom(BaseSynthesizer):
+        def synth_chunk(self, text):
+            raise FatalSynthError("worker dead")
+
+    with pytest.raises(FatalSynthError):
+        Boom().synth_paragraphs([["a", "b"]])
+    with pytest.raises(FatalSynthError):
+        Boom().synth_chunks(["a"])

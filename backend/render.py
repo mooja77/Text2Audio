@@ -15,6 +15,10 @@ from pipeline.normalize import normalize_text
 WAV_SUBDIR = "wav"
 
 
+def _default_synth_factory(voice_id, speed):
+    return Synthesizer(voice=voice_id, lang_code=PRESET_VOICES[voice_id], speed=float(speed))
+
+
 def _wav_dir(library, job_id: str) -> str:
     d = os.path.join(library.new_dir(job_id), WAV_SUBDIR)
     os.makedirs(d, exist_ok=True)
@@ -32,7 +36,7 @@ def _chapter_meta(chapter_wavs):
 
 
 def render_audiobook(*, book_text, voice, speed, title, author, cover_path,
-                     library, job_id, emit, synth_factory=Synthesizer,
+                     library, job_id, emit, synth_factory=_default_synth_factory,
                      custom_rules=None) -> dict:
     chapters = parse_chapters(book_text, default_title=title or "Audiobook")
     workdir = library.new_dir(job_id)
@@ -48,22 +52,28 @@ def render_audiobook(*, book_text, voice, speed, title, author, cover_path,
 
 def _render_into(workdir, chapters, *, voice, speed, title, author, cover_path,
                  library, job_id, emit, synth_factory, custom_rules=None) -> dict:
-    synth = synth_factory(voice=voice, lang_code=PRESET_VOICES[voice], speed=float(speed))
+    synth = synth_factory(voice, float(speed))
     wav_dir = _wav_dir(library, job_id)
 
     n = len(chapters)
     chapter_wavs = []
     wav_files = []
-    for i, ch in enumerate(chapters):
-        emit({"type": "progress", "chapterIndex": i, "chapterCount": n,
-              "chapterTitle": ch.title, "percent": round(i / max(1, n) * 100)})
-        audio = synth.synth_paragraphs(chunk_paragraphs(normalize_text(ch.text, custom_rules)))
-        if len(audio) == 0:
-            audio = np.zeros(int(0.5 * SAMPLE_RATE), dtype=np.float32)
-        rel = os.path.join(WAV_SUBDIR, f"chapter_{i + 1:03d}.wav")
-        write_wav(audio, os.path.join(workdir, rel))
-        chapter_wavs.append((ch.title, os.path.join(workdir, rel)))
-        wav_files.append(rel)
+    try:
+        for i, ch in enumerate(chapters):
+            emit({"type": "progress", "chapterIndex": i, "chapterCount": n,
+                  "chapterTitle": ch.title, "percent": round(i / max(1, n) * 100)})
+            audio = synth.synth_paragraphs(chunk_paragraphs(normalize_text(ch.text, custom_rules)))
+            if len(audio) == 0:
+                audio = np.zeros(int(0.5 * SAMPLE_RATE), dtype=np.float32)
+            rel = os.path.join(WAV_SUBDIR, f"chapter_{i + 1:03d}.wav")
+            write_wav(audio, os.path.join(workdir, rel))
+            chapter_wavs.append((ch.title, os.path.join(workdir, rel)))
+            wav_files.append(rel)
+    finally:
+        # Deterministically tear down the synthesizer (e.g. the F5 subprocess)
+        # rather than waiting for garbage collection.
+        if hasattr(synth, "close"):
+            synth.close()
 
     cover_dest = None
     if cover_path:

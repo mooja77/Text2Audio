@@ -11,7 +11,7 @@ from contextlib import asynccontextmanager
 import soundfile as sf
 from pathlib import Path
 
-from fastapi import FastAPI, File, HTTPException, Request, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -21,6 +21,8 @@ from backend.library import Library, new_id
 from backend.jobs import JobManager
 from backend.render import render_audiobook, remaster, purge_wavs
 from backend.pronunciations import PronunciationStore
+from backend.voices import VoiceStore
+from pipeline.clone_synth import ClonedSynthesizer
 from pipeline.normalize import normalize_text, BUILTIN_PRONUNCIATIONS
 from pipeline.ingest import build_book_text
 from pipeline.parse import parse_chapters
@@ -29,10 +31,11 @@ ROOT = Path(__file__).parent
 WEB_DIR = ROOT / "web"
 LIBRARY_DIR = os.environ.get("T2A_LIBRARY_DIR", str(ROOT / "library"))
 
-SYNTH_FACTORY = Synthesizer          # tests monkeypatch this
 library = Library(LIBRARY_DIR)
 PRON_PATH = os.environ.get("T2A_PRON_PATH", os.path.join(os.path.dirname(LIBRARY_DIR), "data", "pronunciations.json"))
 pron = PronunciationStore(PRON_PATH)
+VOICES_DIR = os.environ.get("T2A_VOICES_DIR", os.path.join(os.path.dirname(LIBRARY_DIR), "voices"))
+voices = VoiceStore(VOICES_DIR)
 jobs = JobManager()
 _render_lock = threading.Lock()      # one GPU render at a time
 
@@ -68,8 +71,23 @@ def voices_payload() -> list[dict]:
     for vid, lang in PRESET_VOICES.items():
         out.append({"id": vid, "label": _VOICE_LABELS.get(vid, vid),
                     "accent": _ACCENT.get(lang, lang),
-                    "gender": "Female" if vid[1] == "f" else "Male"})
+                    "gender": "Female" if vid[1] == "f" else "Male", "kind": "preset"})
+    for v in voices.list():
+        out.append({"id": v["id"], "label": v["name"], "name": v["name"],
+                    "accent": "Cloned", "gender": "", "kind": "cloned"})
     return out
+
+
+def resolve_synth(voice_id, speed):
+    if voice_id in PRESET_VOICES:
+        return Synthesizer(voice=voice_id, lang_code=PRESET_VOICES[voice_id], speed=float(speed))
+    meta = voices.get(voice_id)
+    if meta is None:
+        raise KeyError(voice_id)
+    return ClonedSynthesizer(voices.ref_path(voice_id), meta.get("refText", ""), float(speed))
+
+
+SYNTH_FACTORY = resolve_synth
 
 
 @asynccontextmanager
@@ -115,7 +133,7 @@ async def ingest(files: list[UploadFile] = File(...)):
 
 @app.post("/api/render")
 def start_render(req: RenderRequest):
-    if req.voice not in PRESET_VOICES:
+    if req.voice not in PRESET_VOICES and voices.get(req.voice) is None:
         raise HTTPException(status_code=400, detail="unknown voice")
     # Serialize renders: concurrent GPU inference from two threads is unsafe.
     if not _render_lock.acquire(blocking=False):
@@ -223,13 +241,17 @@ _PREVIEW_TEXT = "This is a sample of the selected narrator voice."
 
 @app.post("/api/voice-preview")
 def voice_preview(req: PreviewRequest):
-    if req.voice not in PRESET_VOICES:
+    if req.voice not in PRESET_VOICES and voices.get(req.voice) is None:
         raise HTTPException(status_code=400, detail="unknown voice")
-    synth = SYNTH_FACTORY(voice=req.voice, lang_code=PRESET_VOICES[req.voice])
-    if hasattr(synth, "preview"):
-        audio = synth.preview(_PREVIEW_TEXT)
-    else:
-        audio = synth.synth_chunks([_PREVIEW_TEXT])
+    synth = SYNTH_FACTORY(req.voice, 1.0)
+    try:
+        if hasattr(synth, "preview"):
+            audio = synth.preview(_PREVIEW_TEXT)
+        else:
+            audio = synth.synth_chunks([_PREVIEW_TEXT])
+    finally:
+        if hasattr(synth, "close"):
+            synth.close()
     buf = io.BytesIO()
     sf.write(buf, audio, SAMPLE_RATE, format="WAV")
     return Response(content=buf.getvalue(), media_type="audio/wav")
@@ -277,6 +299,29 @@ def pronunciations_remove(word: str):
 @app.post("/api/normalize-preview")
 def normalize_preview(req: NormalizePreviewRequest):
     return {"normalized": normalize_text(req.text, pron.get_all())}
+
+
+@app.post("/api/voices/clone")
+async def voices_clone(name: str = Form(...), audio: UploadFile = File(...),
+                       refText: str = Form("")):
+    if not name.strip():
+        raise HTTPException(status_code=400, detail="name is required")
+    data = await audio.read()
+    if not data:
+        raise HTTPException(status_code=400, detail="audio is required")
+    ext = os.path.splitext(audio.filename or "")[1] or ".wav"
+    try:
+        return voices.create(name.strip(), data, ext, refText.strip())
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.delete("/api/voices/{id}")
+def voices_delete(id: str):
+    if voices.get(id) is None:
+        raise HTTPException(status_code=404, detail="not found")
+    voices.delete(id)
+    return {"deleted": id}
 
 
 # IMPORTANT: keep this static mount as the LAST route registration in the file.

@@ -5,6 +5,13 @@ SAMPLE_RATE = 24000
 SENTENCE_GAP = 0.15
 PARAGRAPH_GAP = 0.6
 
+
+class FatalSynthError(Exception):
+    """An unrecoverable synthesis failure (e.g. the cloning worker died).
+
+    The per-chunk retry/skip logic deliberately does NOT swallow this — it aborts
+    the render so the failure is surfaced rather than yielding a silent book."""
+
 # voice_id -> lang_code (lang_code must match the voice's language prefix).
 PRESET_VOICES: dict[str, str] = {
     # American English — female
@@ -31,17 +38,11 @@ def concat_with_gaps(audio_arrays, gap_seconds: float = 0.3, sample_rate: int = 
     return np.concatenate(out)
 
 
-class Synthesizer:
-    def __init__(self, voice: str = "af_heart", lang_code: str = "a",
-                 device: str = "cuda", speed: float = 1.0):
-        from kokoro import KPipeline
-        self.pipeline = KPipeline(lang_code=lang_code, device=device)
-        self.voice = voice
-        self.speed = speed
+class BaseSynthesizer:
+    """Engine-agnostic synthesis: subclasses implement synth_chunk(text)."""
 
     def synth_chunk(self, text: str) -> np.ndarray:
-        parts = [audio for _, _, audio in self.pipeline(text, voice=self.voice, speed=self.speed)]
-        return concat_with_gaps(parts, gap_seconds=0.0)
+        raise NotImplementedError
 
     def synth_chunks(self, chunks, progress=None) -> np.ndarray:
         out = []
@@ -51,6 +52,8 @@ class Synthesizer:
                 try:
                     audio = self.synth_chunk(chunk)
                     break
+                except FatalSynthError:
+                    raise
                 except Exception:
                     audio = None
             if audio is not None and len(audio) > 0:
@@ -71,6 +74,8 @@ class Synthesizer:
                     try:
                         audio = self.synth_chunk(chunk)
                         break
+                    except FatalSynthError:
+                        raise
                     except Exception:
                         audio = None
                 if audio is not None and len(audio) > 0:
@@ -85,3 +90,16 @@ class Synthesizer:
 
     def preview(self, text: str = "This is a sample of the selected narrator voice.") -> np.ndarray:
         return self.synth_chunk(text)
+
+
+class Synthesizer(BaseSynthesizer):
+    def __init__(self, voice: str = "af_heart", lang_code: str = "a",
+                 device: str = "cuda", speed: float = 1.0):
+        from kokoro import KPipeline
+        self.pipeline = KPipeline(lang_code=lang_code, device=device)
+        self.voice = voice
+        self.speed = speed
+
+    def synth_chunk(self, text: str) -> np.ndarray:
+        parts = [audio for _, _, audio in self.pipeline(text, voice=self.voice, speed=self.speed)]
+        return concat_with_gaps(parts, gap_seconds=0.0)
