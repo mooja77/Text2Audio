@@ -1,50 +1,79 @@
-# Text2Audio
+# 🎧 Text2Audio
 
-Turn a plain-text book into a natural-sounding, chaptered `.m4b` audiobook —
-free and fully local, using the Kokoro-82M TTS model on your GPU.
+**Turn a book into a natural-sounding, chaptered audiobook — for free, fully on your own machine.**
+
+Text2Audio is a local, open-source audiobook studio. Drop in your manuscript
+(`.txt` or Markdown), pick a narrator, and get a mastered `.m4b` audiobook with
+chapter markers — no cloud, no accounts, no per-use cost. It can even **clone a
+voice** from a short audio sample.
+
+It runs entirely offline on your own GPU using open text-to-speech models
+(Kokoro-82M by default; F5-TTS for voice cloning).
+
+---
+
+## Features
+
+- 📖 **Book → audiobook** — `.txt` / Markdown in, chaptered `.m4b` out (plays in
+  Apple Books, Smart AudioBook Player, BookPlayer, etc. with chapter navigation).
+- 🖥️ **Studio web UI** — drag-and-drop multi-file import, a voice gallery, live
+  per-chapter progress, a built-in chapter player, and a library of your renders.
+- 🎚️ **Mastered audio** — 128 kbps AAC, loudness-normalized (~−19 LUFS), high-pass
+  filtered, with natural sentence/paragraph pacing. Re-master any book instantly
+  (no re-synthesis).
+- 🗣️ **Reads text correctly** — expands numbers/abbreviations and an editable
+  **pronunciation dictionary** fixes tricky names.
+- 🎤 **Voice cloning** (optional) — upload ~10–30 s of speech and narrate in that
+  voice, via F5-TTS (runs isolated; Kokoro stays the fast default).
+- 🔒 **100% local & free** — your text and audio never leave your machine.
 
 ## Requirements
 
-- Windows (tested) with an NVIDIA GPU + recent driver
-- Python 3.10–3.12
-- [ffmpeg](https://www.gyan.dev/ffmpeg/builds/) on your PATH (provides `ffmpeg` and `ffprobe`)
-- [espeak-ng](https://github.com/espeak-ng/espeak-ng/releases) (install the Windows `.msi`)
+- Windows (developed/tested on Windows 11; should adapt to Linux/macOS) with an
+  **NVIDIA GPU** + recent driver (CPU works but is slow).
+- **Python 3.10–3.12**
+- **[ffmpeg](https://www.gyan.dev/ffmpeg/builds/)** on your `PATH` (provides
+  `ffmpeg` and `ffprobe`).
+- **[espeak-ng](https://github.com/espeak-ng/espeak-ng/releases)** (Windows `.msi`)
+  — phonemizer backend for Kokoro.
 
 ## Setup
 
 ```powershell
+git clone https://github.com/mooja77/Text2Audio.git
+cd Text2Audio
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
+# Install a CUDA build of PyTorch first (pick the index for your CUDA version):
 pip install --index-url https://download.pytorch.org/whl/cu124 torch
 pip install -r requirements.txt
 ```
 
-If espeak-ng is not auto-detected, set:
+If espeak-ng isn't auto-detected, point to it:
 
 ```powershell
 setx PHONEMIZER_ESPEAK_LIBRARY "C:\Program Files\eSpeak NG\libespeak-ng.dll"
 setx PHONEMIZER_ESPEAK_PATH "C:\Program Files\eSpeak NG\espeak-ng.exe"
 ```
 
-## Run (Studio UI)
+## Run
 
 ```powershell
 .\.venv\Scripts\python.exe server.py
 ```
 
-Opens the Text2Audio Studio in your browser. **Create** tab: drag in `.md`/`.txt`
-chapter files (Markdown is auto-cleaned, one file per chapter), set
-title/voice/speed, and Generate — live per-chapter progress streams as it
-renders. **Voices** tab: audition any narrator. **Library** tab: every finished
-audiobook with an in-app chapter player, retag, and delete. Finished books are
-saved under `library/<id>/book.m4b`.
+Your browser opens the Studio. **Create** tab: drag in `.md`/`.txt` chapter files
+(Markdown is auto-cleaned), set title/voice/speed, and **Generate** — live
+per-chapter progress streams as it renders. **Voices**: audition narrators or
+clone one. **Library**: every finished audiobook with an in-app chapter player,
+re-master, and delete.
 
-The classic single-screen Gradio UI is still available via `python app.py`
-(upload one `.txt`, **Detect chapters**, **Generate Audiobook** → `output/`).
+> A classic single-screen UI is also available: `python app.py`.
 
-## Chapter markers
+### Chapter markers
 
-Best results: put a marker line before each chapter using the prefix `## `:
+For one-file-per-chapter imports, each file's first `# Heading` becomes the
+chapter title. For a single `.txt`, put a marker line before each chapter:
 
 ```
 ## Chapter One
@@ -54,41 +83,66 @@ Once upon a time...
 ...
 ```
 
-If you don't add markers, the app auto-detects `Chapter N` and ALL-CAPS heading
-lines. If it finds none, the whole book becomes one chapter.
-
-## Voices
-
-Built-in Kokoro narrators (American `af_*`/`am_*`, British `bf_*`/`bm_*`).
-`af_heart` is a great default. Use **Preview voice** to audition.
+If there are no markers, it auto-detects `Chapter N` / ALL-CAPS headings, else
+treats the whole text as one chapter.
 
 ## Voice cloning (optional)
 
-Narrate in a cloned voice via F5-TTS. It's a heavy, optional engine — Kokoro stays
-the fast default, and cloning runs in an isolated subprocess.
+Voice cloning uses **F5-TTS**, a heavier optional engine. Kokoro stays the
+default; cloning runs in an isolated subprocess (F5 and Kokoro can't share a
+process).
 
 ```powershell
 .\.venv\Scripts\python.exe -m pip install f5-tts
-# IMPORTANT: f5-tts may pull a mismatched torchaudio. Re-pin it to match torch:
+# f5-tts may pull a mismatched torchaudio — re-pin it to match your torch:
 .\.venv\Scripts\python.exe -m pip install "torchaudio==2.6.0" --index-url https://download.pytorch.org/whl/cu124
 ```
 
-Then in the **Voices** tab → **Clone a voice**: give it a name, upload ~10–30s of
-clean speech, and (optionally) paste a transcript of the clip for best quality.
-The cloned voice appears alongside the built-ins and can be selected in **Create**.
-Cloned renders are higher quality but much slower than Kokoro — use **▶ Sample** to
-audition before committing to a full book.
+Then in **Voices → Clone a voice**: name it, upload ~10–30 s of clean speech, and
+(optionally) paste a transcript of the clip for best quality. The cloned voice
+appears alongside the built-ins and in the Create dropdown. Cloned renders are
+higher quality but much slower — use **▶ Sample** to audition first.
 
-GPU cloning test is opt-in: `$env:RUN_F5=1; pytest tests/test_clone_synth.py`.
+### ⚠️ Responsible use
+
+Only clone voices you have the right to use — **your own voice, voices you have
+explicit permission to clone, or public-domain recordings**. Do not impersonate
+people or create deceptive audio. You are responsible for how you use this tool.
 
 ## Tests
+
+The suite runs **without a GPU** (the TTS engines are mocked):
 
 ```powershell
 pytest -q
 ```
 
-GPU model tests are opt-in: `$env:RUN_KOKORO=1; pytest tests/test_synth.py`.
+GPU model tests are opt-in: `$env:RUN_KOKORO=1; pytest tests/test_synth.py` and
+`$env:RUN_F5=1; pytest tests/test_clone_synth.py`.
+
+## How it works
+
+```
+book (.txt/.md) → ingest (clean markdown) → normalize (numbers/abbr/pronunciation)
+   → chunk (sentence/paragraph) → synthesize (Kokoro or F5) → assemble (ffmpeg:
+   chapters + loudness master) → .m4b in your library/
+```
+
+Project layout: `pipeline/` (text→audio), `backend/` (library, jobs, render,
+voices, pronunciations), `server.py` (FastAPI + web API), `web/` (vanilla-JS UI).
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). Issues and PRs welcome.
 
 ## License
 
-Uses Kokoro-82M (Apache-2.0).
+Text2Audio's code is **MIT** (see [LICENSE](LICENSE)). The TTS **models** it
+downloads have their own licenses — notably the F5-TTS cloning weights are
+**CC-BY-NC (non-commercial)**. See [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).
+
+## Acknowledgements
+
+- [Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M) — default narration
+- [F5-TTS](https://github.com/SWivid/F5-TTS) — voice cloning
+- ffmpeg, espeak-ng, FastAPI, and the wider open-source ecosystem
