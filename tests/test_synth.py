@@ -107,3 +107,29 @@ def test_fatal_synth_error_not_swallowed():
         Boom().synth_paragraphs([["a", "b"]])
     with pytest.raises(FatalSynthError):
         Boom().synth_chunks(["a"])
+
+
+def test_nonfatal_chunk_failure_retries_then_aborts():
+    from pipeline.synth import BaseSynthesizer, ChunkSynthError
+
+    class Boom(BaseSynthesizer):
+        calls = 0
+        def synth_chunk(self, text):
+            self.calls += 1
+            raise RuntimeError("model failure")
+
+    synth = Boom()
+    with pytest.raises(ChunkSynthError, match="model failure"):
+        synth.synth_chunks(["must not disappear"])
+    assert synth.calls == 2
+
+
+def test_empty_chunk_audio_aborts():
+    from pipeline.synth import BaseSynthesizer, ChunkSynthError
+
+    class Empty(BaseSynthesizer):
+        def synth_chunk(self, text):
+            return np.zeros(0, dtype=np.float32)
+
+    with pytest.raises(ChunkSynthError, match="empty audio"):
+        Empty().synth_paragraphs([["text"]])

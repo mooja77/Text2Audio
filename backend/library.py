@@ -27,15 +27,24 @@ class Library:
         return d
 
     def save_manifest(self, id: str, manifest: dict) -> None:
-        with open(os.path.join(self._dir(id), MANIFEST_NAME), "w", encoding="utf-8") as f:
+        path = os.path.join(self._dir(id), MANIFEST_NAME)
+        tmp = path + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
             json.dump(manifest, f, ensure_ascii=False, indent=2)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, path)
 
     def get(self, id: str) -> dict | None:
         path = os.path.join(self._dir(id), MANIFEST_NAME)
         if not os.path.isfile(path):
             return None
-        with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                value = json.load(f)
+            return value if isinstance(value, dict) else None
+        except (json.JSONDecodeError, OSError):
+            return None
 
     def list(self) -> list[dict]:
         items = []

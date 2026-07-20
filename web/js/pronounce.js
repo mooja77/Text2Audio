@@ -42,8 +42,10 @@ const Pronounce = {
       `<div class="filerow"><span class="nm">${T2A.esc(w)} → ${T2A.esc(s)}</span><button class="x" data-w="${T2A.esc(w)}">✕</button></div>`).join("")
       : `<span class="muted">No custom rules yet — add one above.</span>`;
     cwrap.querySelectorAll(".x").forEach(b => b.onclick = async () => {
-      await T2A.api(`/api/pronunciations/${encodeURIComponent(b.dataset.w)}`, { method: "DELETE" });
-      this.refresh();
+      try {
+        await T2A.api(`/api/pronunciations/${encodeURIComponent(b.dataset.w)}`, { method: "DELETE" });
+        this.refresh();
+      } catch (e) { T2A.toast("Delete failed: " + e.message); }
     });
     document.getElementById("pbuiltin").textContent =
       Object.entries(d.builtin).map(([w, s]) => `${w} → ${s}`).join("   ·   ");
@@ -53,12 +55,14 @@ const Pronounce = {
     const w = document.getElementById("pw").value.trim();
     const s = document.getElementById("ps").value.trim();
     if (!w || !s) { T2A.toast("Enter both a word and how to say it"); return; }
-    await T2A.api(`/api/pronunciations/${encodeURIComponent(w)}`, {
-      method: "PUT", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ sayAs: s }) });
-    document.getElementById("pw").value = "";
-    document.getElementById("ps").value = "";
-    T2A.toast("Rule added"); this.refresh();
+    try {
+      await T2A.api(`/api/pronunciations/${encodeURIComponent(w)}`, {
+        method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sayAs: s }) });
+      document.getElementById("pw").value = "";
+      document.getElementById("ps").value = "";
+      T2A.toast("Rule added"); this.refresh();
+    } catch (e) { T2A.toast("Could not add rule: " + e.message); }
   },
 
   async test() {

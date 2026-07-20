@@ -41,3 +41,10 @@ def test_no_headings_single_chapter_uses_default_title():
 
 def test_empty_input_returns_empty_list():
     assert parse_chapters("   \n  \n") == []
+
+
+def test_explicit_marker_requires_separator_and_does_not_consume_h3():
+    chapters = parse_chapters("##not a heading\nbody", default_title="Book")
+    assert chapters == [Chapter("Book", "##not a heading\nbody")]
+    chapters = parse_chapters("### Subheading\nbody", default_title="Book")
+    assert chapters == [Chapter("Book", "### Subheading\nbody")]
