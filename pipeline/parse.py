@@ -12,7 +12,8 @@ class Chapter:
 
 
 def _is_explicit_heading(line: str, token: str) -> bool:
-    return line.strip().startswith(token)
+    stripped = line.strip()
+    return stripped == token or stripped.startswith(token + " ")
 
 
 def _explicit_title(line: str, token: str) -> str:

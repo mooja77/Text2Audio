@@ -1,6 +1,7 @@
 // Shared state, API helpers, tab routing.
 const T2A = {
-  state: { voices: [], files: [], bookText: "", chapters: [], voice: "af_heart", speed: 0.9 },
+  state: { voices: [], files: [], bookText: "", chapters: [], voice: "af_heart", speed: 0.9,
+    ingestVersion: 0, ingestReady: false },
   // Escape user-controlled text before interpolating into innerHTML.
   esc(s) {
     return String(s ?? "").replace(/[&<>"']/g,
@@ -31,7 +32,11 @@ window.addEventListener("DOMContentLoaded", async () => {
   document.querySelectorAll(".tab").forEach(b => b.onclick = () => T2A.showTab(b.dataset.tab));
   try {
     const health = await T2A.api("/api/health");
-    if (!health.ffmpeg) document.getElementById("ffmpeg-warn").hidden = false;
+    const missing = [!health.ffmpeg && "ffmpeg", !health.espeak && "espeak-ng"].filter(Boolean);
+    if (missing.length) {
+      const warn = document.getElementById("ffmpeg-warn");
+      warn.textContent = `⚠ ${missing.join(" and ")} not found`; warn.hidden = false;
+    }
     T2A.state.voices = await T2A.api("/api/voices");
   } catch (e) { T2A.toast("Backend not reachable"); }
   Create.render();

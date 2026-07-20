@@ -36,8 +36,12 @@ class VoiceStore:
         p = os.path.join(self._dir(id), META_NAME)
         if not os.path.isfile(p):
             return None
-        with open(p, "r", encoding="utf-8") as f:
-            return json.load(f)
+        try:
+            with open(p, "r", encoding="utf-8") as f:
+                value = json.load(f)
+            return value if isinstance(value, dict) else None
+        except (json.JSONDecodeError, OSError):
+            return None
 
     def list(self) -> list[dict]:
         items = []
@@ -58,7 +62,8 @@ class VoiceStore:
         vid = new_voice_id()
         d = self._dir(vid)
         os.makedirs(d, exist_ok=True)
-        src = os.path.join(d, "_src" + (src_ext if src_ext.startswith(".") else ".bin"))
+        ext = src_ext.lower() if re.fullmatch(r"\.[a-z0-9]{1,10}", src_ext or "") else ".bin"
+        src = os.path.join(d, "_src" + ext)
         with open(src, "wb") as f:
             f.write(audio_bytes)
         out = self.ref_path(vid)
@@ -73,6 +78,10 @@ class VoiceStore:
                 os.remove(src)
         manifest = {"id": vid, "name": name, "refText": ref_text or "",
                     "created": datetime.datetime.now().isoformat(timespec="seconds")}
-        with open(os.path.join(d, META_NAME), "w", encoding="utf-8") as f:
+        meta_path = os.path.join(d, META_NAME)
+        with open(meta_path + ".tmp", "w", encoding="utf-8") as f:
             json.dump(manifest, f, ensure_ascii=False, indent=2)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(meta_path + ".tmp", meta_path)
         return manifest

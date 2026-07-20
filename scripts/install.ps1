@@ -40,6 +40,10 @@ try { & nvidia-smi *> $null; if ($LASTEXITCODE -eq 0) { $gpu = $true } } catch {
 if ($gpu) {
     Say "NVIDIA GPU detected - installing CUDA PyTorch"
     & $vpy -m pip install torch --index-url https://download.pytorch.org/whl/cu124
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "CUDA PyTorch was unavailable; falling back to the CPU build." -ForegroundColor Yellow
+        & $vpy -m pip install torch
+    }
 } else {
     Say "No NVIDIA GPU - installing CPU PyTorch (works, just slower)"
     & $vpy -m pip install torch
@@ -48,10 +52,18 @@ if ($gpu) {
 # 4) App dependencies
 Say "Installing Text2Audio dependencies"
 & $vpy -m pip install -r requirements.txt
+if ($LASTEXITCODE -ne 0) { throw "Application dependency installation failed." }
 
 # 5) System tools
 if (-not (Have "ffmpeg")) { Winget "Gyan.FFmpeg" "ffmpeg" }
 if (-not (Test-Path "C:\Program Files\eSpeak NG\libespeak-ng.dll")) { Winget "eSpeak-NG.eSpeak-NG" "espeak-ng" }
+$env:Path = [Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [Environment]::GetEnvironmentVariable("Path","User")
+if (-not (Have "ffmpeg")) {
+    Write-Host "ffmpeg is still unavailable. Install it manually before rendering." -ForegroundColor Yellow
+}
+if (-not (Have "espeak-ng") -and -not (Test-Path "C:\Program Files\eSpeak NG\espeak-ng.exe")) {
+    Write-Host "espeak-ng is still unavailable. Install it manually before using Kokoro." -ForegroundColor Yellow
+}
 
 # 6) Desktop shortcut
 try {

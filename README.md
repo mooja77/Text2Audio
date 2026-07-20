@@ -129,7 +129,8 @@ per-chapter progress streams as it renders. **Voices**: audition narrators or
 clone one. **Library**: every finished audiobook with an in-app chapter player,
 re-master, and delete.
 
-> A classic single-screen UI is also available: `python app.py`.
+> A classic single-screen UI is also available. Install its optional dependency
+> with `pip install "text2audio[classic]"`, then run `python app.py` from a source checkout.
 
 ### Chapter markers
 

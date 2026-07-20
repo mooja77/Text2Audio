@@ -12,6 +12,10 @@ class FatalSynthError(Exception):
     The per-chunk retry/skip logic deliberately does NOT swallow this — it aborts
     the render so the failure is surfaced rather than yielding a silent book."""
 
+
+class ChunkSynthError(FatalSynthError):
+    """Raised after a text chunk exhausts its synthesis retries."""
+
 # voice_id -> lang_code (lang_code must match the voice's language prefix).
 PRESET_VOICES: dict[str, str] = {
     # American English — female
@@ -48,16 +52,20 @@ class BaseSynthesizer:
         out = []
         for i, chunk in enumerate(chunks):
             audio = None
+            last_error = None
             for _attempt in range(2):  # one retry
                 try:
                     audio = self.synth_chunk(chunk)
                     break
                 except FatalSynthError:
                     raise
-                except Exception:
+                except Exception as exc:
+                    last_error = exc
                     audio = None
-            if audio is not None and len(audio) > 0:
-                out.append(audio)
+            if audio is None or len(audio) == 0:
+                detail = f": {last_error}" if last_error else " (empty audio returned)"
+                raise ChunkSynthError(f"synthesis failed after 2 attempts for {chunk[:80]!r}{detail}") from last_error
+            out.append(audio)
             if progress is not None:
                 progress(i + 1, len(chunks))
         return concat_with_gaps(out, gap_seconds=0.3)
@@ -70,16 +78,21 @@ class BaseSynthesizer:
             chunk_audios = []
             for chunk in para:
                 audio = None
+                last_error = None
                 for _attempt in range(2):  # one retry
                     try:
                         audio = self.synth_chunk(chunk)
                         break
                     except FatalSynthError:
                         raise
-                    except Exception:
+                    except Exception as exc:
+                        last_error = exc
                         audio = None
-                if audio is not None and len(audio) > 0:
-                    chunk_audios.append(audio)
+                if audio is None or len(audio) == 0:
+                    detail = f": {last_error}" if last_error else " (empty audio returned)"
+                    raise ChunkSynthError(
+                        f"synthesis failed after 2 attempts for {chunk[:80]!r}{detail}") from last_error
+                chunk_audios.append(audio)
                 done += 1
                 if progress is not None:
                     progress(done, total)

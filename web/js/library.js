@@ -34,23 +34,24 @@ const Library = {
     Player.mount(document.getElementById("playerwrap"), item);
     document.getElementById("del").onclick = async () => {
       if (!confirm("Delete this audiobook?")) return;
-      await T2A.api(`/api/library/${id}`, { method: "DELETE" }); T2A.toast("Deleted"); this.render(); };
+      try { await T2A.api(`/api/library/${id}`, { method: "DELETE" }); T2A.toast("Deleted"); this.render(); }
+      catch (e) { T2A.toast("Delete failed: " + e.message); } };
     document.getElementById("retag").onclick = async () => {
       const title = prompt("Title", item.title); if (title === null) return;
       const author = prompt("Author", item.author || ""); if (author === null) return;
-      await T2A.api(`/api/library/${id}/retag`, { method: "POST",
+      try { await T2A.api(`/api/library/${id}/retag`, { method: "POST",
         headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title, author }) });
-      T2A.toast("Updated"); this.detail(id); };
+        T2A.toast("Updated"); this.detail(id); } catch (e) { T2A.toast("Update failed: " + e.message); } };
     if (item.wavKept) {
       document.getElementById("remaster").onclick = async () => {
         T2A.toast("Re-mastering…");
-        await T2A.api(`/api/library/${id}/remaster`, { method: "POST",
+        try { await T2A.api(`/api/library/${id}/remaster`, { method: "POST",
           headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) });
-        T2A.toast("Re-mastered"); this.detail(id); };
+          T2A.toast("Re-mastered"); this.detail(id); } catch (e) { T2A.toast("Re-master failed: " + e.message); } };
       document.getElementById("purge").onclick = async () => {
         if (!confirm("Delete the source WAVs? You won't be able to re-master without re-rendering.")) return;
-        await T2A.api(`/api/library/${id}/purge-wav`, { method: "POST" });
-        T2A.toast("Source audio purged"); this.detail(id); };
+        try { await T2A.api(`/api/library/${id}/purge-wav`, { method: "POST" });
+          T2A.toast("Source audio purged"); this.detail(id); } catch (e) { T2A.toast("Purge failed: " + e.message); } };
     }
   },
 };

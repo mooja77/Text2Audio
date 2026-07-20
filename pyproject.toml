@@ -24,6 +24,7 @@ dependencies = [
 
 [project.optional-dependencies]
 clone = ["f5-tts>=1.1"]
+classic = ["gradio>=4.0"]
 
 [project.urls]
 Homepage = "https://github.com/mooja77/Text2Audio"

@@ -1,3 +1,5 @@
+import os
+
 from backend.library import Library, new_id
 
 
@@ -40,3 +42,15 @@ def test_audio_and_cover_paths(tmp_path):
     # cover_path returns None until a cover.jpg exists
     assert lib.cover_path("y") is None
     open(lib.audio_path("y"), "wb").close()  # touch to ensure dir works
+
+
+def test_corrupt_manifest_isolated_from_library_list(tmp_path):
+    lib = Library(str(tmp_path))
+    good = lib.new_dir("good")
+    lib.save_manifest("good", {"id": "good", "created": "2026"})
+    bad = lib.new_dir("bad")
+    with open(os.path.join(bad, "manifest.json"), "w", encoding="utf-8") as f:
+        f.write("{broken")
+    assert lib.get("bad") is None
+    assert [m["id"] for m in lib.list()] == ["good"]
+    assert not os.path.exists(os.path.join(good, "manifest.json.tmp"))

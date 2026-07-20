@@ -42,8 +42,10 @@ const Voices = {
     cards.querySelectorAll(".del").forEach(b => b.onclick = async e => {
       e.stopPropagation();
       if (!confirm("Delete this cloned voice?")) return;
-      await T2A.api(`/api/voices/${encodeURIComponent(b.dataset.v)}`, { method: "DELETE" });
-      T2A.toast("Deleted"); this.refresh();
+      try {
+        await T2A.api(`/api/voices/${encodeURIComponent(b.dataset.v)}`, { method: "DELETE" });
+        T2A.toast("Deleted"); this.refresh();
+      } catch (err) { T2A.toast("Delete failed: " + err.message); }
     });
   },
 
@@ -67,7 +69,9 @@ const Voices = {
     try {
       const r = await fetch("/api/voice-preview", { method: "POST",
         headers: { "Content-Type": "application/json" }, body: JSON.stringify({ voice }) });
-      const blob = await r.blob(); new Audio(URL.createObjectURL(blob)).play();
+      if (!r.ok) throw new Error(await r.text());
+      const blob = await r.blob(); const url = URL.createObjectURL(blob); const audio = new Audio(url);
+      audio.onended = audio.onerror = () => URL.revokeObjectURL(url); await audio.play();
     } catch (e) { T2A.toast("Sample failed"); }
     btn.textContent = old;
   },

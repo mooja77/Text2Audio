@@ -15,6 +15,7 @@ def client(tmp_path, monkeypatch):
 def test_health_ok(client):
     r = client.get("/api/health")
     assert r.status_code == 200 and r.json()["status"] == "ok"
+    assert {"ffmpeg", "espeak", "libraryWritable", "voiceCloning"} <= r.json().keys()
 
 
 def test_voices_listed(client):
@@ -122,6 +123,14 @@ def test_retag_and_delete(client, monkeypatch):
     r = client.post(f"/api/library/{jid}/retag", json={"title": "New Title", "author": "New Author"})
     assert r.status_code == 200
     assert client.get(f"/api/library/{jid}").json()["title"] == "New Title"
+    import subprocess, server
+    probe = subprocess.run(["ffprobe", "-v", "error", "-print_format", "json",
+                            "-show_format", "-show_chapters", server.library.audio_path(jid)],
+                           capture_output=True, text=True, check=True)
+    tagged = _json.loads(probe.stdout)
+    assert tagged["format"]["tags"]["title"] == "New Title"
+    assert tagged["format"]["tags"]["artist"] == "New Author"
+    assert len(tagged["chapters"]) == 1
     assert client.delete(f"/api/library/{jid}").status_code == 200
     assert client.get(f"/api/library/{jid}").status_code == 404
 
@@ -138,6 +147,19 @@ def test_voice_preview_returns_wav(client, monkeypatch):
 def test_unknown_voice_render_returns_400(client):
     r = client.post("/api/render", json={"bookText": "## A\n\nhi", "voice": "nope"})
     assert r.status_code == 400
+
+
+@pytest.mark.parametrize("speed", [0.1, 2.0])
+def test_render_rejects_out_of_range_speed(client, speed):
+    r = client.post("/api/render", json={"bookText": "## A\nhi", "speed": speed})
+    assert r.status_code == 422
+
+
+def test_ingest_rejects_oversized_upload(client, monkeypatch):
+    import server
+    monkeypatch.setattr(server, "MAX_INGEST_BYTES", 3)
+    r = client.post("/api/ingest", files={"files": ("a.txt", b"four", "text/plain")})
+    assert r.status_code == 413
 
 
 def test_invalid_library_id_rejected(client):
@@ -174,6 +196,15 @@ def test_second_render_rejected_while_busy(client, monkeypatch):
                 break
 
 
+def test_preview_rejected_while_render_busy(client, monkeypatch):
+    import server
+    assert server._render_lock.acquire(blocking=False)
+    try:
+        assert client.post("/api/voice-preview", json={"voice": "af_heart"}).status_code == 409
+    finally:
+        server._render_lock.release()
+
+
 def test_render_ignores_client_supplied_cover_path(client, monkeypatch):
     # A client-supplied filesystem path must never be read/copied by the server.
     import server
@@ -198,6 +229,12 @@ def test_remaster_endpoint_updates_manifest(client, monkeypatch):
     assert r.status_code == 200
     assert r.json()["bitrate"] == "96k"
     assert client.get(f"/api/library/{jid}").json()["bitrate"] == "96k"
+
+
+def test_remaster_rejects_unsupported_bitrate(client, monkeypatch):
+    import server
+    jid = _make_one(client, server, monkeypatch)
+    assert client.post(f"/api/library/{jid}/remaster", json={"bitrate": "999k"}).status_code == 422
 
 
 def test_purge_endpoint_flips_flags_and_blocks_remaster(client, monkeypatch):

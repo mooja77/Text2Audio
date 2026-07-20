@@ -56,6 +56,7 @@ const Create = {
   addFiles(fileList) {
     const wanted = fileList.filter(f => /\.(md|txt)$/i.test(f.name));
     T2A.state.files.push(...wanted);
+    T2A.state.bookText = ""; T2A.state.ingestReady = false;
     T2A.state.files.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
     this.renderFiles(); this.refreshChapters();
   },
@@ -68,9 +69,10 @@ const Create = {
          <span class="wc">${Math.round(f.size / 6)}w</span>
          <button class="x" data-x="${i}">✕</button></div>`).join("");
     fl.querySelectorAll(".x").forEach(b => b.onclick = () => {
-      T2A.state.files.splice(+b.dataset.x, 1); this.renderFiles(); this.refreshChapters(); });
+      T2A.state.files.splice(+b.dataset.x, 1); T2A.state.bookText = "";
+      T2A.state.ingestReady = false; this.renderFiles(); this.refreshChapters(); });
     this.enableReorder(fl);
-    document.getElementById("gen").disabled = T2A.state.files.length === 0;
+    document.getElementById("gen").disabled = !T2A.state.files.length || !T2A.state.ingestReady;
   },
 
   enableReorder(fl) {
@@ -82,25 +84,40 @@ const Create = {
       row.ondrop = e => {
         e.preventDefault(); const dropI = +row.dataset.i;
         const arr = T2A.state.files; const [m] = arr.splice(dragI, 1); arr.splice(dropI, 0, m);
+        T2A.state.bookText = ""; T2A.state.ingestReady = false;
         this.renderFiles(); this.refreshChapters();
       };
     });
   },
 
   async refreshChapters() {
+    const version = ++T2A.state.ingestVersion;
     const chaps = document.getElementById("chaps");
     if (!T2A.state.files.length) { chaps.innerHTML = `<span class="muted">Add files to see chapters.</span>`;
-      T2A.state.chapters = []; document.getElementById("chcount").textContent = ""; return; }
+      T2A.state.bookText = ""; T2A.state.ingestReady = false; T2A.state.chapters = [];
+      document.getElementById("chcount").textContent = ""; return false; }
+    T2A.state.ingestReady = false;
+    document.getElementById("gen").disabled = true;
     const fd = new FormData();
     T2A.state.files.forEach(f => fd.append("files", f));
     try {
       const data = await T2A.api("/api/ingest", { method: "POST", body: fd });
+      if (version !== T2A.state.ingestVersion) return false;
       T2A.state.bookText = data.bookText; T2A.state.chapters = data.chapters;
+      T2A.state.ingestReady = data.chapters.length > 0;
+      document.getElementById("gen").disabled = !T2A.state.ingestReady;
       document.getElementById("chcount").textContent = `· ${data.chapters.length}`;
       chaps.innerHTML = data.chapters.map(c =>
         `<div class="chapline"><span class="ci">${c.index + 1}</span>
          <span class="ct">${T2A.esc(c.title)}</span><span class="cc">${c.chars.toLocaleString()} chars</span></div>`).join("");
-    } catch (e) { T2A.toast("Ingest failed"); }
+      return T2A.state.ingestReady;
+    } catch (e) {
+      if (version === T2A.state.ingestVersion) {
+        T2A.state.bookText = ""; T2A.state.chapters = []; T2A.state.ingestReady = false;
+        document.getElementById("gen").disabled = true; T2A.toast("Ingest failed: " + e.message);
+      }
+      return false;
+    }
   },
 
   async preview() {
@@ -109,13 +126,15 @@ const Create = {
       const r = await fetch("/api/voice-preview", { method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ voice: T2A.state.voice }) });
-      const blob = await r.blob(); new Audio(URL.createObjectURL(blob)).play();
+      if (!r.ok) throw new Error(await r.text());
+      const blob = await r.blob(); const url = URL.createObjectURL(blob); const audio = new Audio(url);
+      audio.onended = audio.onerror = () => URL.revokeObjectURL(url); await audio.play();
     } catch (e) { T2A.toast("Preview failed"); }
     btn.textContent = "▶ Preview";
   },
 
   async generate() {
-    if (!T2A.state.bookText) { await this.refreshChapters(); }
+    if (!T2A.state.ingestReady && !await this.refreshChapters()) return;
     const gen = document.getElementById("gen"); gen.disabled = true;
     const prog = document.getElementById("prog"); prog.hidden = false;
     const body = {
@@ -149,6 +168,12 @@ const Create = {
         src.close(); gen.disabled = false;
       }
     };
-    src.onerror = () => { src.close(); gen.disabled = false; };
+    src.onerror = () => {
+      if (src.readyState === EventSource.CLOSED) {
+        gen.disabled = false; document.getElementById("pmsg").textContent = "Connection lost";
+      } else {
+        document.getElementById("pmsg").textContent = "Reconnecting to render…";
+      }
+    };
   },
 };

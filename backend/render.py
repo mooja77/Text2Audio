@@ -2,6 +2,7 @@
 import datetime
 import os
 import shutil
+import subprocess
 
 import numpy as np
 import soundfile as sf
@@ -129,3 +130,20 @@ def purge_wavs(library, id) -> dict:
     m["wavFiles"] = []
     library.save_manifest(id, m)
     return m
+
+
+def retag_audio(library, id, title: str, author: str) -> None:
+    """Update container tags without re-encoding audio or losing chapters."""
+    source = library.audio_path(id)
+    if not os.path.isfile(source):
+        raise FileNotFoundError(source)
+    temp = source + ".retag.m4b"
+    cmd = ["ffmpeg", "-y", "-i", source, "-map", "0:a", "-map", "0:v?", "-map_metadata", "0",
+           "-metadata", f"title={title}", "-metadata", f"artist={author}",
+           "-codec", "copy", temp]
+    try:
+        subprocess.run(cmd, check=True, capture_output=True, text=True)
+        os.replace(temp, source)
+    finally:
+        if os.path.exists(temp):
+            os.remove(temp)
