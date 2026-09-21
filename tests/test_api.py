@@ -32,6 +32,16 @@ def test_index_served(client):
     assert r.status_code == 200 and "Text2Audio" in r.text
 
 
+def test_onboarding_help_and_safe_example_are_packaged(client):
+    index = client.get("/").text
+    assert 'data-tab="help"' in index
+    assert client.get("/js/help.js").status_code == 200
+    example = client.get("/examples/sample-book.txt")
+    assert example.status_code == 200 and "The Beginning" in example.text
+    captions = client.get("/help/text2audio-walkthrough.vtt")
+    assert captions.status_code == 200 and captions.text.startswith("WEBVTT")
+
+
 def test_ingest_returns_chapters(client):
     files = [
         ("files", ("Chapter01_A.md", b"# Chapter 1 - Alpha\n\nFirst body.", "text/markdown")),

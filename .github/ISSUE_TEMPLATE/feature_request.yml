@@ -1,0 +1,16 @@
+name: Feature request
+description: Suggest an improvement to Text2Audio
+title: "[Feature]: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: outcome
+    attributes:
+      label: What result do you need?
+      description: Explain the audiobook workflow you want to improve. Use synthetic examples only.
+    validations:
+      required: true
+  - type: textarea
+    id: workaround
+    attributes:
+      label: What do you do today?

@@ -31,6 +31,23 @@ Don't want to touch a command line? On Windows you can be up and running in thre
 2. Double-click **`Install Text2Audio.bat`**. It sets everything up for you — Python, the app and its dependencies, ffmpeg, and espeak-ng. The first run takes a while; just let it finish.
 3. Double-click **`Start Text2Audio`** (the installer also adds a shortcut to your Desktop). Your browser opens the Studio — start making audiobooks. Keep the little black window open while you use the app; closing it stops Text2Audio.
 
+Inside Studio, the optional five-step beginner guide is resumable and dismissible:
+
+1. Add `.txt`/Markdown or choose **Use safe example**.
+2. Check the detected chapters.
+3. Choose and preview a narrator.
+4. Generate the audiobook.
+5. Listen in **Library**.
+
+Experienced users can select **Skip guide** and work directly. If only the browser
+page refreshes during a render, Studio reconnects to the active job. A finished `.m4b`
+plus its local manifest is the durable first useful result.
+
+- **[Searchable help and privacy guide](docs/HELP.md)**
+- **[Captioned short walkthrough with matching steps](docs/WALKTHROUGH.md)**
+- **[Ask for help](https://github.com/mooja77/Text2Audio/issues/new?template=bug_report.yml)**
+- **[Request a feature](https://github.com/mooja77/Text2Audio/issues/new?template=feature_request.yml)**
+
 > 💡 The first time you generate audio, the voice model (a few hundred MB) downloads automatically. After that, everything runs fully offline.
 >
 > ⚠️ Windows may show a blue **"Windows protected your PC"** SmartScreen box on the `.bat` files — click **More info → Run anyway** (see below). The scripts are plain text you can open and read first. A full walkthrough, voice-cloning setup, and troubleshooting live in **[INSTALL.md](INSTALL.md)**.

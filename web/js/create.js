@@ -8,17 +8,19 @@ const Create = {
     el.innerHTML = `
       <h2>Create audiobook</h2>
       <p class="subtitle">Drop in your chapter files (.md or .txt), set options, and generate.</p>
+      ${Onboarding.markup()}
       <div class="grid2">
         <div class="panel">
           <div class="label">Source files</div>
           <div class="dropzone" id="dz">Drop .md / .txt files here, or click to browse
             <input type="file" id="fi" multiple accept=".md,.txt" hidden></div>
+          <button class="btn example" id="use-example" type="button">Use safe example</button>
           <div class="filelist" id="fl"></div>
         </div>
         <div class="panel">
           <div class="label">Settings</div>
-          <div class="field"><label>Title</label><input id="f-title" placeholder="My Book"></div>
-          <div class="field"><label>Author</label><input id="f-author" placeholder="Author name"></div>
+          <div class="field"><label>Title</label><input id="f-title" placeholder="My Book" value="${T2A.esc(this.savedSetting("title"))}"></div>
+          <div class="field"><label>Author</label><input id="f-author" placeholder="Author name" value="${T2A.esc(this.savedSetting("author"))}"></div>
           <div class="field"><label>Narrator voice</label>
             <div class="voicepick"><select id="f-voice">${voiceOpts}</select>
               <button class="btn" id="f-prev">▶ Preview</button></div></div>
@@ -36,6 +38,22 @@ const Create = {
         <div class="chaplist" id="chaps"><span class="muted">Add files to see chapters.</span></div>
       </div>`;
     this.bind();
+    Onboarding.bind();
+  },
+
+  savedSetting(name) {
+    try { return JSON.parse(localStorage.getItem("text2audio.settings") || "{}")[name] || ""; }
+    catch { return ""; }
+  },
+
+  saveSettings() {
+    const settings = {
+      title: document.getElementById("f-title")?.value || "",
+      author: document.getElementById("f-author")?.value || "",
+      voice: T2A.state.voice,
+      speed: T2A.state.speed,
+    };
+    localStorage.setItem("text2audio.settings", JSON.stringify(settings));
   },
 
   bind() {
@@ -45,12 +63,31 @@ const Create = {
     dz.ondragover = e => { e.preventDefault(); dz.classList.add("drag"); };
     dz.ondragleave = () => dz.classList.remove("drag");
     dz.ondrop = e => { e.preventDefault(); dz.classList.remove("drag"); this.addFiles([...e.dataTransfer.files]); };
-    document.getElementById("f-voice").onchange = e => T2A.state.voice = e.target.value;
+    document.getElementById("use-example").onclick = () => this.loadExample();
+    document.getElementById("f-voice").onchange = e => { T2A.state.voice = e.target.value; this.saveSettings(); };
     document.getElementById("f-speed").oninput = e => {
-      T2A.state.speed = parseFloat(e.target.value); document.getElementById("spd").textContent = e.target.value; };
+      T2A.state.speed = parseFloat(e.target.value); document.getElementById("spd").textContent = e.target.value; this.saveSettings(); };
+    document.getElementById("f-title").oninput = () => this.saveSettings();
+    document.getElementById("f-author").oninput = () => this.saveSettings();
     document.getElementById("f-prev").onclick = () => this.preview();
     document.getElementById("gen").onclick = () => this.generate();
     this.renderFiles();
+  },
+
+  async loadExample() {
+    try {
+      const r = await fetch("/examples/sample-book.txt");
+      if (!r.ok) throw new Error("example unavailable");
+      const text = await r.text();
+      const file = new File([text], "safe-example-book.txt", { type: "text/plain" });
+      T2A.state.files = [];
+      this.addFiles([file]);
+      document.getElementById("f-title").value = "A Quiet Village";
+      document.getElementById("f-author").value = "Synthetic Example";
+      this.saveSettings();
+      Onboarding.advanceTo(1);
+      T2A.toast("Safe example loaded");
+    } catch { T2A.toast("Could not load the safe example"); }
   },
 
   addFiles(fileList) {
@@ -105,6 +142,7 @@ const Create = {
       if (version !== T2A.state.ingestVersion) return false;
       T2A.state.bookText = data.bookText; T2A.state.chapters = data.chapters;
       T2A.state.ingestReady = data.chapters.length > 0;
+      if (T2A.state.ingestReady) Onboarding.advanceTo(2);
       document.getElementById("gen").disabled = !T2A.state.ingestReady;
       document.getElementById("chcount").textContent = `· ${data.chapters.length}`;
       chaps.innerHTML = data.chapters.map(c =>
@@ -145,8 +183,25 @@ const Create = {
       const res = await T2A.api("/api/render", { method: "POST",
         headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       jobId = res.jobId;
+      localStorage.setItem("text2audio.activeJob", jobId);
+      Onboarding.advanceTo(3);
     } catch (e) { T2A.toast("Could not start render"); gen.disabled = false; return; }
 
+    this.attachRender(jobId);
+  },
+
+  resumeActiveRender() {
+    const jobId = localStorage.getItem("text2audio.activeJob");
+    if (!jobId || !/^[0-9a-f]{6,32}$/.test(jobId)) return;
+    const prog = document.getElementById("prog");
+    const gen = document.getElementById("gen");
+    prog.hidden = false; gen.disabled = true;
+    document.getElementById("pmsg").textContent = "Reconnecting to the current render…";
+    this.attachRender(jobId, true);
+  },
+
+  attachRender(jobId, resumed = false) {
+    const gen = document.getElementById("gen");
     const t0 = Date.now();
     const src = new EventSource(`/api/render/${jobId}/stream`);
     src.onmessage = ev => {
@@ -162,10 +217,12 @@ const Create = {
         document.getElementById("barf").style.width = "100%";
         document.getElementById("ppct").textContent = "100%";
         document.getElementById("pmsg").textContent = "Done ✓";
-        src.close(); gen.disabled = false; T2A.toast("Audiobook ready"); T2A.showTab("library");
+        src.close(); gen.disabled = false; localStorage.removeItem("text2audio.activeJob");
+        T2A.state.firstValue = true; Onboarding.complete();
+        T2A.toast(resumed ? "Render recovered — audiobook ready" : "Audiobook ready"); T2A.showTab("library");
       } else if (e.type === "error") {
         document.getElementById("pmsg").textContent = "Error: " + (e.message || "render failed");
-        src.close(); gen.disabled = false;
+        src.close(); gen.disabled = false; localStorage.removeItem("text2audio.activeJob");
       }
     };
     src.onerror = () => {

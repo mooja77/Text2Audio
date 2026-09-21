@@ -1,0 +1,28 @@
+name: Bug report
+description: Ask for help with something that is not working
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: "GitHub issues are public. Do not upload a private manuscript, cloned voice, copyrighted source text, or logs containing private text. Reproduce with the built-in safe example when possible."
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: What happened?
+      description: Include the steps and exact non-private error text.
+    validations:
+      required: true
+  - type: checkboxes
+    id: safe
+    attributes:
+      label: Privacy check
+      options:
+        - label: I have not included private text, voices, personal data, or secrets.
+          required: true

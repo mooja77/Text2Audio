@@ -1,7 +1,7 @@
 // Shared state, API helpers, tab routing.
 const T2A = {
   state: { voices: [], files: [], bookText: "", chapters: [], voice: "af_heart", speed: 0.9,
-    ingestVersion: 0, ingestReady: false },
+    ingestVersion: 0, ingestReady: false, firstValue: false },
   // Escape user-controlled text before interpolating into innerHTML.
   esc(s) {
     return String(s ?? "").replace(/[&<>"']/g,
@@ -25,6 +25,8 @@ const T2A = {
     if (name === "library") Library.render();
     if (name === "create") Create.render();
     if (name === "pronounce") Pronounce.render();
+    if (name === "help") Help.render();
+    location.hash = name === "create" ? "" : name;
   },
 };
 
@@ -38,6 +40,15 @@ window.addEventListener("DOMContentLoaded", async () => {
       warn.textContent = `⚠ ${missing.join(" and ")} not found`; warn.hidden = false;
     }
     T2A.state.voices = await T2A.api("/api/voices");
+    let saved = {};
+    try { saved = JSON.parse(localStorage.getItem("text2audio.settings") || "{}"); }
+    catch { localStorage.removeItem("text2audio.settings"); }
+    if (saved.voice) T2A.state.voice = saved.voice;
+    if (Number.isFinite(saved.speed)) T2A.state.speed = saved.speed;
+    T2A.state.firstValue = (await T2A.api("/api/library")).length > 0;
   } catch (e) { T2A.toast("Backend not reachable"); }
   Create.render();
+  Create.resumeActiveRender();
+  const initialTab = location.hash.replace(/^#/, "");
+  if (["library", "create", "voices", "pronounce", "help"].includes(initialTab)) T2A.showTab(initialTab);
 });
