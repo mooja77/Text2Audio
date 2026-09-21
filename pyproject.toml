@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "text2audio"
-version = "1.0.0"
+version = "1.2.0"
 description = "Free, local, open-source audiobook studio with AI narration and voice cloning."
 readme = "README.md"
 license = { text = "MIT" }
