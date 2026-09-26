@@ -55,6 +55,17 @@ def test_ingest_returns_chapters(client):
     assert "bookText" in data and "## Chapter 1 - Alpha" in data["bookText"]
 
 
+def test_parse_text_preview(client):
+    r = client.post("/api/parse-text", json={"text": "## One\nHello\n## Two\nWorld"})
+    assert r.status_code == 200
+    assert [c["title"] for c in r.json()["chapters"]] == ["One", "Two"]
+
+
+def test_ingest_rejects_unsupported_type(client):
+    r = client.post("/api/ingest", files={"files": ("bad.exe", b"x", "application/octet-stream")})
+    assert r.status_code == 400
+
+
 import json as _json
 import numpy as np
 from pipeline.synth import SAMPLE_RATE
@@ -159,6 +170,22 @@ def test_unknown_voice_render_returns_400(client):
     assert r.status_code == 400
 
 
+def test_render_rejects_whitespace_only_book(client):
+    assert client.post("/api/render", json={"bookText": "   \n"}).status_code == 400
+
+
+def test_render_upload_rejects_non_image_cover(client):
+    r = client.post("/api/render-upload", data={"bookText": "## A\nhello"},
+                    files={"cover": ("cover.jpg", b"not an image", "image/jpeg")})
+    assert r.status_code == 400
+
+
+def test_cross_site_mutation_rejected(client):
+    r = client.post("/api/render", json={"bookText": "## A\nhello"},
+                    headers={"Origin": "https://evil.example", "Sec-Fetch-Site": "cross-site"})
+    assert r.status_code == 403
+
+
 @pytest.mark.parametrize("speed", [0.1, 2.0])
 def test_render_rejects_out_of_range_speed(client, speed):
     r = client.post("/api/render", json={"bookText": "## A\nhi", "speed": speed})
@@ -239,6 +266,19 @@ def test_remaster_endpoint_updates_manifest(client, monkeypatch):
     assert r.status_code == 200
     assert r.json()["bitrate"] == "96k"
     assert client.get(f"/api/library/{jid}").json()["bitrate"] == "96k"
+
+
+def test_quality_report_and_wav_export(client, monkeypatch):
+    import io, server, zipfile
+    jid = _make_one(client, server, monkeypatch, "Quality")
+    report = client.get(f"/api/library/{jid}/quality")
+    assert report.status_code == 200
+    assert report.json()["audio"]["durationSeconds"] > 0
+    exported = client.get(f"/api/library/{jid}/export/wav")
+    assert exported.status_code == 200
+    with zipfile.ZipFile(io.BytesIO(exported.content)) as archive:
+        assert any(name.endswith(".wav") for name in archive.namelist())
+        assert "README.txt" in archive.namelist()
 
 
 def test_remaster_rejects_unsupported_bitrate(client, monkeypatch):

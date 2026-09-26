@@ -27,8 +27,12 @@ const Library = {
       <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn" id="retag">Retag</button>
         ${item.wavKept ? '<button class="btn" id="remaster">Re-master</button>' +
+          '<button class="btn" id="export-wav">Export chapter WAVs</button>' +
+          '<button class="btn" id="export-acx">Export ACX-review MP3s</button>' +
           '<button class="btn" id="purge">Purge source audio</button>' : ''}
+        <button class="btn" id="quality">Audio quality report</button>
         <button class="btn" id="del">Delete</button></div>
+      <div id="quality-report" class="panel" style="margin-top:12px" hidden></div>
       ${item.wavKept ? '<div class="muted" style="margin-top:8px;font-size:12px">Source audio kept — you can re-master instantly. Purge to reclaim disk space.</div>' : ''}`;
     document.getElementById("back").onclick = () => this.render();
     Player.mount(document.getElementById("playerwrap"), item);
@@ -42,7 +46,24 @@ const Library = {
       try { await T2A.api(`/api/library/${id}/retag`, { method: "POST",
         headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title, author }) });
         T2A.toast("Updated"); this.detail(id); } catch (e) { T2A.toast("Update failed: " + e.message); } };
+    document.getElementById("quality").onclick = async () => {
+      const wrap = document.getElementById("quality-report");
+      try {
+        const q = await T2A.api(`/api/library/${id}/quality`);
+        wrap.hidden = false;
+        wrap.innerHTML = `<div class="label">Audio quality</div>
+          <p>${q.personalM4bPass ? "✓ Personal M4B checks passed" : "⚠ Personal M4B needs review"}</p>
+          <p class="muted">${T2A.esc(q.audio.codec)} · ${q.audio.sampleRate.toLocaleString()} Hz · ${Math.round(q.audio.bitrate / 1000)} kbps · peak ${q.audio.peakDb ?? "unknown"} dB · mean ${q.audio.meanDb ?? "unknown"} dB</p>
+          <p class="muted">ACX submission ready: ${q.acxSubmissionPass ? "yes" : "no"}. ${T2A.esc(q.note)}</p>`;
+      } catch (e) { T2A.toast("Quality analysis failed: " + e.message); }
+    };
     if (item.wavKept) {
+      document.getElementById("export-wav").onclick = () => {
+        location.href = `/api/library/${id}/export/wav`;
+      };
+      document.getElementById("export-acx").onclick = () => {
+        location.href = `/api/library/${id}/export/acx-review`;
+      };
       document.getElementById("remaster").onclick = async () => {
         T2A.toast("Re-mastering…");
         try { await T2A.api(`/api/library/${id}/remaster`, { method: "POST",

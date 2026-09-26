@@ -26,8 +26,8 @@ responsible for complying with each model's license for your use case.
 ## Python libraries
 
 Installed via `requirements.txt` under their own licenses, e.g. `fastapi`,
-`uvicorn`, `soundfile`, `numpy`, `num2words`, `kokoro`, `f5-tts`, `torch`,
-`torchaudio`, `gradio`. See each project for its license.
+`uvicorn`, `soundfile`, `numpy`, `num2words`, `kokoro`, `pypdf`, `torch`, and
+optional `f5-tts`, `torchaudio`, and `gradio`. See each project for its license.
 
 ## Responsible voice cloning
 

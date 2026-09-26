@@ -56,6 +56,7 @@ def test_build_m4b_applies_master_filters_and_bitrate(tmp_path, monkeypatch):
 
     def fake_run(cmd, **kwargs):
         captured["cmd"] = cmd
+        open(cmd[-1], "wb").close()
         class R: pass
         return R()
 
@@ -78,7 +79,10 @@ def test_build_m4b_applies_master_filters_and_bitrate(tmp_path, monkeypatch):
 def test_build_m4b_master_false_omits_filters(tmp_path, monkeypatch):
     import pipeline.assemble as asm
     captured = {}
-    monkeypatch.setattr(asm.subprocess, "run", lambda cmd, **k: captured.setdefault("cmd", cmd))
+    def fake_run(cmd, **kwargs):
+        captured["cmd"] = cmd
+        open(cmd[-1], "wb").close()
+    monkeypatch.setattr(asm.subprocess, "run", fake_run)
     monkeypatch.setattr(asm.shutil, "which", lambda x: "ffmpeg")
     import numpy as np
     from pipeline.synth import SAMPLE_RATE
@@ -88,6 +92,23 @@ def test_build_m4b_master_false_omits_filters(tmp_path, monkeypatch):
     cmd = captured["cmd"]
     assert "-af" not in cmd
     assert "96k" in cmd
+
+
+def test_build_failure_preserves_existing_output(tmp_path, monkeypatch):
+    import pipeline.assemble as asm
+    wav = str(tmp_path / "c.wav")
+    asm.write_wav(np.zeros(SAMPLE_RATE, dtype=np.float32), wav)
+    output = tmp_path / "book.m4b"
+    output.write_bytes(b"known-good")
+    monkeypatch.setattr(asm.shutil, "which", lambda x: "ffmpeg")
+    def fail(cmd, **kwargs):
+        open(cmd[-1], "wb").write(b"partial")
+        raise subprocess.CalledProcessError(1, cmd)
+    monkeypatch.setattr(asm.subprocess, "run", fail)
+    with pytest.raises(subprocess.CalledProcessError):
+        asm.build_m4b([("C1", wav)], str(output), master=False)
+    assert output.read_bytes() == b"known-good"
+    assert not (tmp_path / "book.m4b.building.m4b").exists()
 
 
 @pytest.mark.skipif(not _HAS_FFMPEG, reason="ffmpeg/ffprobe not installed")

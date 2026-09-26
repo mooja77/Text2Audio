@@ -38,14 +38,17 @@ def main() -> None:
         req = json.loads(line)
         if req.get("cmd") == "quit":
             break
-        wav, sr, _ = model.infer(
-            ref_file=req["ref"], ref_text=req["ref_text"], gen_text=req["text"],
-            speed=req.get("speed", 1.0), show_info=_silent, progress=None)
-        wav = np.asarray(wav, dtype=np.float32)
-        fd, path = tempfile.mkstemp(suffix=".wav")
-        os.close(fd)
-        sf.write(path, wav, sr)
-        emit({"wav": path, "sr": int(sr)})
+        try:
+            wav, sr, _ = model.infer(
+                ref_file=req["ref"], ref_text=req["ref_text"], gen_text=req["text"],
+                speed=req.get("speed", 1.0), show_info=_silent, progress=None)
+            wav = np.asarray(wav, dtype=np.float32)
+            fd, path = tempfile.mkstemp(suffix=".wav")
+            os.close(fd)
+            sf.write(path, wav, sr)
+            emit({"wav": path, "sr": int(sr)})
+        except Exception as exc:
+            emit({"error": f"{type(exc).__name__}: {exc}"})
 
 
 if __name__ == "__main__":

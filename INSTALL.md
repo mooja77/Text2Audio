@@ -29,7 +29,8 @@ A black window opens and walks through the setup automatically:
 - Creates a private workspace for the app (a `.venv` folder) so it doesn't touch the
   rest of your system.
 - Detects whether you have an **NVIDIA graphics card**. If you do, it installs the fast
-  GPU version; if not, it installs the CPU version (it still works — just slower).
+  GPU version; if not, it installs the CPU version. At runtime Text2Audio automatically
+  chooses CUDA, Apple MPS, or CPU (CPU still works — just slower).
 - Installs the app's dependencies, plus **ffmpeg** and **espeak-ng** (the tools that
   build the audiobook file and help pronounce words).
 - Adds a **Text2Audio** shortcut to your Desktop.
@@ -65,7 +66,9 @@ folder).
 - A small black window opens and stays open — that's the app running. **Leave it open**
   while you use Text2Audio; closing it stops the app.
 - Your web browser opens automatically to the Text2Audio Studio.
-- Drag in your chapter files (`.txt` or Markdown), pick a voice, and click **Generate**.
+- Drag in your manuscript (`.txt`, Markdown, DOCX, EPUB or text-based PDF), review the
+  detected chapters, optionally edit the prepared text/add cover art, pick a voice,
+  and click **Generate**.
 
 When you're finished, just close the black window.
 
@@ -81,6 +84,8 @@ Everything stays inside the Text2Audio folder you unzipped:
 - **`library/`** — your finished audiobooks (`.m4b` files with chapter markers).
 - **`voices/`** — any voices you've cloned.
 - **`output/`** — working/intermediate audio.
+- **`data/chunk-cache/`** — reusable local narration chunks that make unchanged
+  rerenders faster. Delete this folder while Text2Audio is stopped to clear the cache.
 
 Nothing is uploaded anywhere — your text and audio never leave your computer.
 

@@ -8,7 +8,7 @@
 🔊 **[Hear a sample](assets/sample.mp3)** — a short clip narrated by Text2Audio.
 
 Text2Audio is a local, open-source audiobook studio. Drop in your manuscript
-(`.txt` or Markdown), pick a narrator, and get a mastered `.m4b` audiobook with
+(`.txt`, Markdown, DOCX, EPUB or text-based PDF), pick a narrator, and get a mastered `.m4b` audiobook with
 chapter markers — no cloud, no accounts, no per-use cost. It can even **clone a
 voice** from a short audio sample.
 
@@ -75,7 +75,8 @@ speed — a CUDA build of PyTorch (`pip` pulls the CPU build by default). See
 
 ## Features
 
-- 📖 **Book → audiobook** — `.txt` / Markdown in, chaptered `.m4b` out (plays in
+- 📖 **Book → audiobook** — `.txt`, Markdown, DOCX, EPUB or text-based PDF in,
+  chaptered `.m4b` out (plays in
   Apple Books, Smart AudioBook Player, BookPlayer, etc. with chapter navigation).
 - 🖥️ **Studio web UI** — drag-and-drop multi-file import, a voice gallery, live
   per-chapter progress, a built-in chapter player, and a library of your renders.
@@ -87,11 +88,17 @@ speed — a CUDA build of PyTorch (`pip` pulls the CPU build by default). See
 - 🎤 **Voice cloning** (optional) — upload ~10–30 s of speech and narrate in that
   voice, via F5-TTS (runs isolated; Kokoro stays the fast default).
 - 🔒 **100% local & free** — your text and audio never leave your machine.
+- ✏️ **Review before rendering** — edit prepared text and chapter markers in Studio.
+- 🖼️ **Cover artwork** — embed JPEG, PNG or WebP art in the finished M4B.
+- 📦 **Flexible export** — personal M4B, lossless chapter WAV ZIP, or ACX-review
+  chapter MP3 ZIP with a machine-readable quality report.
+- ⏹️ **Long-render controls** — chunk-level progress, cancellation and browser refresh recovery.
 
 ## Requirements
 
-- Windows (developed/tested on Windows 11; should adapt to Linux/macOS) with an
-  **NVIDIA GPU** + recent driver (CPU works but is slow).
+- Windows (developed/tested on Windows 11), Linux, or macOS. Text2Audio automatically
+  selects NVIDIA CUDA, Apple MPS, or CPU; CPU works but is slow. Set `T2A_DEVICE`
+  to `cuda`, `mps`, or `cpu` to override detection.
 - **Python 3.10–3.12**
 - **[ffmpeg](https://www.gyan.dev/ffmpeg/builds/)** on your `PATH` (provides
   `ffmpeg` and `ffprobe`).
@@ -140,11 +147,15 @@ The project is plain Python and cross-platform. The commands are the same, excep
 .\.venv\Scripts\python.exe server.py
 ```
 
-Your browser opens the Studio. **Create** tab: drag in `.md`/`.txt` chapter files
+Your browser opens the Studio. **Create** tab: drag in a supported manuscript
 (Markdown is auto-cleaned), set title/voice/speed, and **Generate** — live
 per-chapter progress streams as it renders. **Voices**: audition narrators or
 clone one. **Library**: every finished audiobook with an in-app chapter player,
 re-master, and delete.
+
+The normal M4B preset is intended for personal listening. The **ACX-review** export
+is a technical starting point, not a guarantee of distributor acceptance: add required
+credits and room tone, listen to every chapter, and validate it with the distributor.
 
 > A classic single-screen UI is also available. Install its optional dependency
 > with `pip install "text2audio[classic]"`, then run `python app.py` from a source checkout.

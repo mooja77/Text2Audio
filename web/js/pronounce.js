@@ -39,7 +39,7 @@ const Pronounce = {
     const cwrap = document.getElementById("pcustom");
     const entries = Object.entries(d.custom);
     cwrap.innerHTML = entries.length ? entries.map(([w, s]) =>
-      `<div class="filerow"><span class="nm">${T2A.esc(w)} → ${T2A.esc(s)}</span><button class="x" data-w="${T2A.esc(w)}">✕</button></div>`).join("")
+      `<div class="filerow"><span class="nm">${T2A.esc(w)} → ${T2A.esc(s)}</span><button class="x" data-w="${T2A.esc(w)}" aria-label="Delete pronunciation for ${T2A.esc(w)}">✕</button></div>`).join("")
       : `<span class="muted">No custom rules yet — add one above.</span>`;
     cwrap.querySelectorAll(".x").forEach(b => b.onclick = async () => {
       try {

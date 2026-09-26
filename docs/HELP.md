@@ -4,7 +4,7 @@ Use your browser's page search (`Ctrl+F` or `Cmd+F`) here, or open the searchabl
 
 ## Start in five steps
 
-1. Add `.txt` or Markdown files. **Use safe example** is available in the Create tab.
+1. Add `.txt`, Markdown, DOCX, EPUB or text-based PDF files. **Use safe example** is available in the Create tab.
 2. Check the detected chapters and their order.
 3. Choose and preview a narrator.
 4. Generate, leaving the Text2Audio process open.
@@ -23,6 +23,10 @@ Text2Audio remembers title, author, voice, speed and guide progress in local bro
 - **Browser did not open:** visit <http://127.0.0.1:8765> while Text2Audio is running.
 - **ffmpeg or espeak-ng missing:** rerun the installer, or install both and restart.
 - **Slow generation:** CPU works slowly; try the short safe example or an NVIDIA GPU.
+- **Wrong device selected:** set `T2A_DEVICE` to `cuda`, `mps`, or `cpu` before starting.
+- **Need to stop:** use **Cancel render**; completed books and prior remasters remain intact.
+- **Publishing:** use the quality report and chapter export in Library. Distribution
+  presets still require editorial listening and the distributor's own validation.
 - **Wrong pronunciation:** add a rule in the Pronounce tab, preview, and regenerate.
 - **First model download:** the first narration downloads model files; later runs use the local cache.
 

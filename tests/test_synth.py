@@ -133,3 +133,23 @@ def test_empty_chunk_audio_aborts():
 
     with pytest.raises(ChunkSynthError, match="empty audio"):
         Empty().synth_paragraphs([["text"]])
+
+
+def test_select_device_cpu_fallback(monkeypatch):
+    import sys, types
+    from pipeline.synth import select_device
+    cuda = types.SimpleNamespace(is_available=lambda: False)
+    mps = types.SimpleNamespace(is_available=lambda: False)
+    monkeypatch.delenv("T2A_DEVICE", raising=False)
+    monkeypatch.setitem(sys.modules, "torch",
+                        types.SimpleNamespace(cuda=cuda, backends=types.SimpleNamespace(mps=mps)))
+    assert select_device() == "cpu"
+
+
+def test_select_device_env_override(monkeypatch):
+    from pipeline.synth import select_device
+    monkeypatch.setenv("T2A_DEVICE", "mps")
+    assert select_device() == "mps"
+    monkeypatch.setenv("T2A_DEVICE", "invalid")
+    with pytest.raises(ValueError):
+        select_device()

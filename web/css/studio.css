@@ -41,6 +41,10 @@ h2{margin:0 0 4px}
 .field input,.field select{width:100%;background:var(--panel2);border:1px solid var(--bd);
   color:var(--tx);border-radius:8px;padding:9px 10px;font-size:14px}
 input[type=range]{width:100%;accent-color:var(--ac)}
+textarea{box-sizing:border-box;background:var(--panel2);border:1px solid var(--bd);color:var(--tx);
+  border-radius:8px;padding:10px;font:14px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace}
+summary{cursor:pointer;color:var(--ac)}
+.progress .btn{margin-top:10px}
 .voicepick{display:flex;gap:8px;align-items:center}
 .voicepick select{flex:1}
 .btn{background:var(--panel2);border:1px solid var(--bd);color:var(--tx);border-radius:9px;

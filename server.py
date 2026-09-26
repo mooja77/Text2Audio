@@ -4,9 +4,11 @@ import importlib.util
 import os
 import re
 import shutil
+import subprocess
 import sys
 import threading
 import webbrowser
+import zipfile
 from contextlib import asynccontextmanager
 
 import soundfile as sf
@@ -14,18 +16,22 @@ from pathlib import Path
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, Response, StreamingResponse
+from starlette.background import BackgroundTask
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from pipeline.synth import Synthesizer, PRESET_VOICES, SAMPLE_RATE
+from pipeline.synth import Synthesizer, PRESET_VOICES, SAMPLE_RATE, select_device
 from backend.library import Library, new_id
 from backend.jobs import JobManager
 from backend.render import render_audiobook, remaster, purge_wavs, retag_audio
 from backend.pronunciations import PronunciationStore
 from backend.voices import VoiceStore
+from backend.quality import build_chapter_export, quality_report
+from backend.cache import ChunkCache
 from pipeline.clone_synth import ClonedSynthesizer
 from pipeline.normalize import normalize_text, BUILTIN_PRONUNCIATIONS
 from pipeline.ingest import build_book_text
+from pipeline.documents import document_to_sources
 from pipeline.parse import parse_chapters
 
 ROOT = Path(__file__).parent
@@ -37,6 +43,9 @@ PRON_PATH = os.environ.get("T2A_PRON_PATH", os.path.join(os.path.dirname(LIBRARY
 pron = PronunciationStore(PRON_PATH)
 VOICES_DIR = os.environ.get("T2A_VOICES_DIR", os.path.join(os.path.dirname(LIBRARY_DIR), "voices"))
 voices = VoiceStore(VOICES_DIR)
+cache = ChunkCache(os.environ.get("T2A_CACHE_DIR",
+                   os.path.join(os.path.dirname(LIBRARY_DIR), "data", "chunk-cache")),
+                   max_bytes=int(os.environ.get("T2A_CACHE_MAX_BYTES", str(5 * 1024**3))))
 jobs = JobManager()
 _render_lock = threading.Lock()      # one GPU render at a time
 _maintenance_lock = threading.Lock()
@@ -44,6 +53,7 @@ _maintenance_lock = threading.Lock()
 MAX_BOOK_CHARS = 20_000_000
 MAX_INGEST_BYTES = 25 * 1024 * 1024
 MAX_VOICE_BYTES = 100 * 1024 * 1024
+MAX_COVER_BYTES = 10 * 1024 * 1024
 
 
 async def _read_upload(upload: UploadFile, limit: int) -> bytes:
@@ -116,6 +126,19 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Text2Audio Studio", lifespan=lifespan)
 
 
+@app.middleware("http")
+async def reject_cross_site_mutations(request: Request, call_next):
+    """Protect localhost mutation endpoints from cross-site browser requests."""
+    if request.method not in {"GET", "HEAD", "OPTIONS"} and request.url.path.startswith("/api/"):
+        origin = request.headers.get("origin")
+        fetch_site = request.headers.get("sec-fetch-site", "")
+        allowed = {"http://127.0.0.1:8765", "http://localhost:8765"}
+        if (origin and origin.rstrip("/") not in allowed) or fetch_site == "cross-site":
+            return Response(content='{"detail":"cross-site request rejected"}', status_code=403,
+                            media_type="application/json")
+    return await call_next(request)
+
+
 @app.get("/api/health")
 def health():
     ffmpeg = shutil.which("ffmpeg")
@@ -123,6 +146,7 @@ def health():
     return {"status": "ok", "ffmpeg": bool(ffmpeg), "espeak": bool(espeak),
             "libraryWritable": os.access(LIBRARY_DIR, os.W_OK),
             "voiceCloning": importlib.util.find_spec("f5_tts") is not None,
+            "device": select_device(),
             "libraryPath": os.path.abspath(LIBRARY_DIR),
             "voicesWritable": os.access(VOICES_DIR, os.W_OK)}
 
@@ -144,8 +168,10 @@ async def ingest(files: list[UploadFile] = File(...)):
     for f in files:
         data = await _read_upload(f, MAX_INGEST_BYTES - total)
         total += len(data)
-        raw = data.decode("utf-8", errors="replace")
-        sources.append((f.filename or "untitled.txt", raw))
+        try:
+            sources.extend(document_to_sources(f.filename or "untitled.txt", data))
+        except (ValueError, zipfile.BadZipFile, KeyError) as exc:
+            raise HTTPException(status_code=400, detail=f"could not import {f.filename}: {exc}") from exc
     book_text = build_book_text(sources)
     chapters = parse_chapters(book_text)
     return {
@@ -155,26 +181,65 @@ async def ingest(files: list[UploadFile] = File(...)):
     }
 
 
-@app.post("/api/render")
-def start_render(req: RenderRequest):
+def _launch_render(req: RenderRequest, cover_data: bytes | None = None):
+    if not req.bookText.strip() or not parse_chapters(req.bookText, default_title=req.title or "Audiobook"):
+        raise HTTPException(status_code=400, detail="book contains no readable text")
     if req.voice not in PRESET_VOICES and voices.get(req.voice) is None:
         raise HTTPException(status_code=400, detail="unknown voice")
     # Serialize renders: concurrent GPU inference from two threads is unsafe.
     if not _render_lock.acquire(blocking=False):
         raise HTTPException(status_code=409, detail="A render is already in progress")
     job_id = new_id()
+    cover_path = None
+    try:
+        if cover_data:
+            workdir = library.new_dir(job_id)
+            cover_path = os.path.join(workdir, "_cover_upload")
+            with open(cover_path, "wb") as handle:
+                handle.write(cover_data)
+    except Exception:
+        _render_lock.release()
+        library.delete(job_id)
+        raise
 
     def target(emit):
         try:
             render_audiobook(book_text=req.bookText, voice=req.voice, speed=req.speed,
-                             title=req.title, author=req.author, cover_path=None,
+                             title=req.title, author=req.author, cover_path=cover_path,
                              library=library, job_id=job_id, emit=emit,
-                             synth_factory=SYNTH_FACTORY, custom_rules=pron.get_all())
+                             synth_factory=SYNTH_FACTORY, custom_rules=pron.get_all(),
+                             cancelled=lambda: jobs.is_cancelled(job_id), chunk_cache=cache)
         finally:
             _render_lock.release()
 
-    jobs.submit(job_id, target)
+    try:
+        jobs.submit(job_id, target)
+    except Exception:
+        _render_lock.release()
+        library.delete(job_id)
+        raise
     return {"jobId": job_id}
+
+
+@app.post("/api/render")
+def start_render(req: RenderRequest):
+    return _launch_render(req)
+
+
+@app.post("/api/render-upload")
+async def start_render_upload(bookText: str = Form(...), voice: str = Form("af_heart"),
+                              speed: float = Form(1.0), title: str = Form(""),
+                              author: str = Form(""), cover: UploadFile | None = File(None)):
+    try:
+        req = RenderRequest(bookText=bookText, voice=voice, speed=speed, title=title, author=author)
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    cover_data = await _read_upload(cover, MAX_COVER_BYTES) if cover else None
+    if cover_data and not (cover_data.startswith(b"\xff\xd8\xff") or
+                           cover_data.startswith(b"\x89PNG\r\n\x1a\n") or
+                           (cover_data.startswith(b"RIFF") and cover_data[8:12] == b"WEBP")):
+        raise HTTPException(status_code=400, detail="cover must be JPEG, PNG, or WebP")
+    return _launch_render(req, cover_data)
 
 
 @app.get("/api/render/{job_id}/stream")
@@ -186,6 +251,23 @@ async def render_stream(job_id: str, request: Request):
         after = 0
     return StreamingResponse(jobs.stream(job_id, request, after=after), media_type="text/event-stream",
                              headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+@app.get("/api/render/{job_id}/status")
+def render_status(job_id: str):
+    _check_id(job_id)
+    status = jobs.status(job_id)
+    if status is None:
+        raise HTTPException(status_code=404, detail="unknown job")
+    return status
+
+
+@app.delete("/api/render/{job_id}")
+def cancel_render(job_id: str):
+    _check_id(job_id)
+    if not jobs.cancel(job_id):
+        raise HTTPException(status_code=409, detail="job is not running")
+    return {"cancelled": job_id}
 
 
 @app.get("/api/library")
@@ -209,6 +291,31 @@ def library_audio(id: str):
     if not os.path.isfile(path):
         raise HTTPException(status_code=404, detail="no audio")
     return FileResponse(path, media_type="audio/mp4")  # Starlette handles Range -> 206
+
+
+@app.get("/api/library/{id}/quality")
+def library_quality(id: str):
+    _check_id(id)
+    try:
+        return quality_report(library, id)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="not found")
+    except subprocess.CalledProcessError as exc:
+        raise HTTPException(status_code=500, detail="audio analysis failed") from exc
+
+
+@app.get("/api/library/{id}/export/{profile}")
+def library_export(id: str, profile: str):
+    _check_id(id)
+    try:
+        archive = build_chapter_export(library, id, profile)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="not found")
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    return FileResponse(archive, filename=f"text2audio-{id}-{profile}.zip",
+                        media_type="application/zip",
+                        background=BackgroundTask(os.remove, archive))
 
 
 @app.get("/api/cover/{id}")
@@ -236,6 +343,11 @@ class PronRule(BaseModel):
 
 class NormalizePreviewRequest(BaseModel):
     text: str = Field(max_length=10_000)
+
+
+class ParseTextRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=MAX_BOOK_CHARS)
+    title: str = Field(default="Audiobook", max_length=300)
 
 
 @app.post("/api/library/{id}/retag")
@@ -340,6 +452,15 @@ def normalize_preview(req: NormalizePreviewRequest):
     return {"normalized": normalize_text(req.text, pron.get_all())}
 
 
+@app.post("/api/parse-text")
+def parse_text_preview(req: ParseTextRequest):
+    chapters = parse_chapters(req.text, default_title=req.title or "Audiobook")
+    if not chapters:
+        raise HTTPException(status_code=400, detail="text contains no readable chapters")
+    return {"chapters": [{"index": i, "title": chapter.title, "chars": len(chapter.text)}
+                         for i, chapter in enumerate(chapters)]}
+
+
 @app.post("/api/voices/clone")
 async def voices_clone(name: str = Form(...), audio: UploadFile = File(...),
                        refText: str = Form("")):
@@ -359,6 +480,8 @@ async def voices_clone(name: str = Form(...), audio: UploadFile = File(...),
 
 @app.delete("/api/voices/{id}")
 def voices_delete(id: str):
+    if _render_lock.locked():
+        raise HTTPException(status_code=409, detail="cannot delete a voice during synthesis")
     if voices.get(id) is None:
         raise HTTPException(status_code=404, detail="not found")
     voices.delete(id)
