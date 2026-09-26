@@ -24,7 +24,8 @@ class JobManager:
             return job_id in self._jobs
 
     def submit(self, job_id: str, target) -> str:
-        state = {"events": [], "complete": False, "updated": time.monotonic()}
+        state = {"events": [], "complete": False, "cancelled": False,
+                 "updated": time.monotonic()}
         with self._lock:
             self._prune()
             self._jobs[job_id] = state
@@ -46,6 +47,28 @@ class JobManager:
 
         threading.Thread(target=run, daemon=True).start()
         return job_id
+
+    def cancel(self, job_id: str) -> bool:
+        with self._lock:
+            state = self._jobs.get(job_id)
+            if state is None or state["complete"]:
+                return False
+            state["cancelled"] = True
+            state["updated"] = time.monotonic()
+            return True
+
+    def is_cancelled(self, job_id: str) -> bool:
+        with self._lock:
+            state = self._jobs.get(job_id)
+            return bool(state and state["cancelled"])
+
+    def status(self, job_id: str) -> dict | None:
+        with self._lock:
+            state = self._jobs.get(job_id)
+            if state is None:
+                return None
+            return {"complete": state["complete"], "cancelled": state["cancelled"],
+                    "eventCount": len(state["events"])}
 
     def drain(self, job_id: str, timeout: float = 5.0) -> list[dict]:
         deadline = time.monotonic() + timeout

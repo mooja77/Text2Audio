@@ -159,3 +159,43 @@ def test_render_aborts_on_fatal_synth_error(tmp_path):
                          synth_factory=lambda vid, sp: DeadSynth(vid, sp))
     assert closed["v"] is True       # closed even on failure (finally)
     assert lib.get("jd") is None     # partial workdir cleaned up
+
+
+def test_real_chunk_interface_streams_progress_and_uses_cache(tmp_path):
+    from pipeline.synth import BaseSynthesizer
+    lib = Library(str(tmp_path / "library"))
+    calls = []
+
+    class StreamingSynth(BaseSynthesizer):
+        def __init__(self, voice, speed): pass
+        def synth_chunk(self, text):
+            calls.append(text)
+            return np.ones(1000, dtype=np.float32) * 0.01
+
+    class MemoryCache:
+        def __init__(self): self.values = {}
+        def get(self, key): return self.values.get(repr(key))
+        def put(self, key, audio): self.values[repr(key)] = audio
+
+    cache = MemoryCache()
+    events = []
+    kwargs = dict(book_text="## A\nFirst sentence. Second sentence.", voice="af_heart",
+                  speed=1.0, title="T", author="", cover_path=None, library=lib,
+                  emit=events.append, synth_factory=StreamingSynth, chunk_cache=cache)
+    render_audiobook(job_id="stream1", **kwargs)
+    first_call_count = len(calls)
+    render_audiobook(job_id="stream2", **kwargs)
+    assert first_call_count > 0 and len(calls) == first_call_count
+    assert any(event.get("chunkCount") for event in events)
+
+
+def test_cancelled_render_removes_partial_work(tmp_path):
+    import pytest
+    from backend.render import RenderCancelled
+    lib = Library(str(tmp_path))
+    with pytest.raises(RenderCancelled):
+        render_audiobook(book_text="## A\nHello.", voice="af_heart", speed=1.0,
+                         title="T", author="", cover_path=None, library=lib,
+                         job_id="cancelled", emit=lambda e: None,
+                         synth_factory=FakeSynth, cancelled=lambda: True)
+    assert lib.get("cancelled") is None

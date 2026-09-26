@@ -66,6 +66,7 @@ def build_m4b(chapter_wavs, output_path: str, book_title=None, author=None,
     with open(meta_path, "w", encoding="utf-8") as f:
         f.write(_build_ffmetadata(titles, durations, book_title, author))
 
+    temp_output = output_path + ".building.m4b"
     cmd = [ffmpeg, "-y", "-f", "concat", "-safe", "0", "-i", concat_path,
            "-i", meta_path]
     if cover:
@@ -75,7 +76,7 @@ def build_m4b(chapter_wavs, output_path: str, book_title=None, author=None,
         cmd += ["-map", "2:v", "-disposition:v", "attached_pic", "-c:v", "mjpeg"]
     if master:
         cmd += ["-af", MASTER_FILTERS]
-    cmd += ["-c:a", "aac", "-b:a", bitrate, output_path]
+    cmd += ["-c:a", "aac", "-b:a", bitrate, temp_output]
 
     try:
         try:
@@ -88,8 +89,12 @@ def build_m4b(chapter_wavs, output_path: str, book_title=None, author=None,
                 raise
             fallback = [a for a in cmd if a not in ("-af", MASTER_FILTERS)]
             subprocess.run(fallback, check=True, capture_output=True, text=True)
+        # Only replace a prior finished audiobook after ffmpeg completed.
+        os.replace(temp_output, output_path)
     finally:
         for tmp in (concat_path, meta_path):
             if os.path.exists(tmp):
                 os.remove(tmp)
+        if os.path.exists(temp_output):
+            os.remove(temp_output)
     return output_path

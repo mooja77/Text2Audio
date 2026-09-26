@@ -12,6 +12,7 @@ python -m venv .venv
 # activate it, then:
 pip install --index-url https://download.pytorch.org/whl/cu124 torch
 pip install -r requirements.txt
+pip install -r requirements-ci.txt
 ```
 
 You also need **ffmpeg** and **espeak-ng** on your system (see the README).

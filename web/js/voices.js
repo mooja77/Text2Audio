@@ -33,7 +33,7 @@ const Voices = {
         <div class="row">
           <button class="btn play" data-v="${T2A.esc(v.id)}">▶ Sample</button>
           <button class="btn use" data-v="${T2A.esc(v.id)}">Use</button>
-          ${v.kind === "cloned" ? `<button class="btn del" data-v="${T2A.esc(v.id)}">✕</button>` : ""}
+          ${v.kind === "cloned" ? `<button class="btn del" data-v="${T2A.esc(v.id)}" aria-label="Delete ${T2A.esc(v.label)}">✕</button>` : ""}
         </div>
       </div>`).join("");
     cards.querySelectorAll(".play").forEach(b => b.onclick = e => { e.stopPropagation(); this.sample(b.dataset.v, b); });

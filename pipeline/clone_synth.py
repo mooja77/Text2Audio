@@ -8,6 +8,8 @@ import json
 import os
 import subprocess
 import sys
+import queue
+import threading
 
 import numpy as np
 import soundfile as sf
@@ -15,6 +17,37 @@ import soundfile as sf
 from pipeline.synth import BaseSynthesizer, FatalSynthError, SAMPLE_RATE
 
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+WORKER_START_TIMEOUT = float(os.environ.get("T2A_F5_START_TIMEOUT", "300"))
+WORKER_CHUNK_TIMEOUT = float(os.environ.get("T2A_F5_CHUNK_TIMEOUT", "600"))
+
+
+def _readline_with_timeout(stream, timeout: float) -> str:
+    result = queue.Queue(maxsize=1)
+
+    def read():
+        try:
+            result.put((stream.readline(), None))
+        except Exception as exc:
+            result.put(("", exc))
+
+    threading.Thread(target=read, daemon=True).start()
+    try:
+        line, error = result.get(timeout=timeout)
+    except queue.Empty as exc:
+        raise TimeoutError from exc
+    if error:
+        raise error
+    return line
+
+
+def _terminate(proc) -> None:
+    if proc is None or proc.poll() is not None:
+        return
+    try:
+        proc.kill()
+        proc.wait(timeout=5)
+    except Exception:
+        pass
 
 
 def _resample(wav: np.ndarray, sr_in: int, sr_out: int) -> np.ndarray:
@@ -32,10 +65,14 @@ def _start_worker():
         stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True, bufsize=1,
         cwd=_PROJECT_ROOT)
     while True:
-        line = proc.stdout.readline()
+        try:
+            line = _readline_with_timeout(proc.stdout, WORKER_START_TIMEOUT)
+        except TimeoutError as exc:
+            _terminate(proc)
+            raise RuntimeError("f5-tts model startup timed out") from exc
         if not line:  # worker exited before signalling ready (e.g. f5 not installed)
             try:
-                proc.kill()
+                _terminate(proc)
             except Exception:
                 pass
             raise RuntimeError("install f5-tts to use cloned voices")
@@ -59,13 +96,21 @@ class ClonedSynthesizer(BaseSynthesizer):
         try:
             self._proc.stdin.write(json.dumps(req) + "\n")
             self._proc.stdin.flush()
-            line = self._proc.stdout.readline()
+            line = _readline_with_timeout(self._proc.stdout, WORKER_CHUNK_TIMEOUT)
+        except TimeoutError as exc:
+            _terminate(self._proc)
+            raise FatalSynthError("f5 synthesis timed out") from exc
         except OSError as exc:  # broken pipe — worker is gone
             raise FatalSynthError("f5 worker exited unexpectedly") from exc
         if not line:
             # Worker died: fatal and unrecoverable — abort rather than retry/skip.
             raise FatalSynthError("f5 worker exited unexpectedly")
-        resp = json.loads(line)
+        try:
+            resp = json.loads(line)
+        except json.JSONDecodeError as exc:
+            raise FatalSynthError("f5 worker returned an invalid response") from exc
+        if "error" in resp:
+            raise FatalSynthError(f"f5 synthesis failed: {resp['error']}")
         wav, sr = sf.read(resp["wav"], dtype="float32")
         try:
             os.remove(resp["wav"])
@@ -82,7 +127,7 @@ class ClonedSynthesizer(BaseSynthesizer):
                 proc.wait(timeout=3)
             except Exception:
                 try:
-                    proc.kill()
+                    _terminate(proc)
                 except Exception:
                     pass
 

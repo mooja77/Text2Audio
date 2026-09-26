@@ -7,6 +7,8 @@ import shutil
 import subprocess
 import uuid
 
+import soundfile as sf
+
 SAMPLE_NAME = "sample.wav"
 META_NAME = "meta.json"
 
@@ -76,6 +78,11 @@ class VoiceStore:
         finally:
             if os.path.exists(src):
                 os.remove(src)
+        info = sf.info(out)
+        duration = info.frames / info.samplerate if info.samplerate else 0
+        if duration < 1 or duration > 120:
+            shutil.rmtree(d, ignore_errors=True)
+            raise ValueError("reference audio must be between 1 and 120 seconds")
         manifest = {"id": vid, "name": name, "refText": ref_text or "",
                     "created": datetime.datetime.now().isoformat(timespec="seconds")}
         meta_path = os.path.join(d, META_NAME)

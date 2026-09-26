@@ -33,6 +33,7 @@ if (-not $py) {
 if (-not (Test-Path ".venv")) { Say "Creating virtual environment"; & $py -m venv .venv }
 $vpy = ".\.venv\Scripts\python.exe"
 & $vpy -m pip install --upgrade pip | Out-Null
+if ($LASTEXITCODE -ne 0) { throw "pip upgrade failed." }
 
 # 3) PyTorch (CUDA if an NVIDIA GPU is present, else CPU)
 $gpu = $false
@@ -43,10 +44,12 @@ if ($gpu) {
     if ($LASTEXITCODE -ne 0) {
         Write-Host "CUDA PyTorch was unavailable; falling back to the CPU build." -ForegroundColor Yellow
         & $vpy -m pip install torch
+        if ($LASTEXITCODE -ne 0) { throw "PyTorch installation failed." }
     }
 } else {
     Say "No NVIDIA GPU - installing CPU PyTorch (works, just slower)"
     & $vpy -m pip install torch
+    if ($LASTEXITCODE -ne 0) { throw "PyTorch installation failed." }
 }
 
 # 4) App dependencies

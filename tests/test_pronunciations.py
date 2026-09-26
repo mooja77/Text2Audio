@@ -32,3 +32,13 @@ def test_corrupt_file_self_heals(tmp_path):
     assert store.get_all() == {}          # doesn't crash on the hot path
     store.set_rule("foo", "bar")          # and editing still works (overwrites)
     assert PronunciationStore(p).get_all() == {"foo": "bar"}
+
+
+def test_wrong_json_shape_is_treated_as_empty(tmp_path):
+    p = tmp_path / "p.json"
+    p.write_text('["not", "a", "mapping"]', encoding="utf-8")
+    store = PronunciationStore(str(p))
+    assert store.get_all() == {}
+    store.set_rule("Name", "Naim")
+    assert store.get_all() == {"name": "Naim"}
+    assert not (tmp_path / "p.json.tmp").exists()

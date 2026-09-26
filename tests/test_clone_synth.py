@@ -66,6 +66,17 @@ def test_synth_chunk_round_trips_via_worker(monkeypatch, tmp_path):
     assert not os.path.exists(wavpath)  # worker temp wav is cleaned up
 
 
+def test_worker_timeout_becomes_fatal_error(monkeypatch):
+    from pipeline.synth import FatalSynthError
+    s = ClonedSynthesizer.__new__(ClonedSynthesizer)
+    s.ref_wav, s.ref_text, s.speed = "ref.wav", "", 1.0
+    s._proc = _FakeProc("", "")
+    monkeypatch.setattr(cs, "_readline_with_timeout",
+                        lambda *a, **k: (_ for _ in ()).throw(TimeoutError()))
+    with pytest.raises(FatalSynthError, match="timed out"):
+        s.synth_chunk("hello")
+
+
 @pytest.mark.skipif(os.environ.get("RUN_F5") != "1",
                     reason="Set RUN_F5=1 to run the real F5 subprocess smoke test")
 def test_f5_smoke(tmp_path):

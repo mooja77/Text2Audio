@@ -1,4 +1,5 @@
 """Kokoro-based synthesis and audio assembly helpers."""
+import os
 import numpy as np
 
 SAMPLE_RATE = 24000
@@ -48,23 +49,27 @@ class BaseSynthesizer:
     def synth_chunk(self, text: str) -> np.ndarray:
         raise NotImplementedError
 
+    def synth_chunk_with_retry(self, text: str) -> np.ndarray:
+        """Synthesize one chunk, retrying once and never silently dropping text."""
+        last_error = None
+        audio = None
+        for _attempt in range(2):
+            try:
+                audio = self.synth_chunk(text)
+                break
+            except FatalSynthError:
+                raise
+            except Exception as exc:
+                last_error = exc
+        if audio is None or len(audio) == 0:
+            detail = f": {last_error}" if last_error else " (empty audio returned)"
+            raise ChunkSynthError(f"synthesis failed after 2 attempts{detail}") from last_error
+        return np.asarray(audio, dtype=np.float32)
+
     def synth_chunks(self, chunks, progress=None) -> np.ndarray:
         out = []
         for i, chunk in enumerate(chunks):
-            audio = None
-            last_error = None
-            for _attempt in range(2):  # one retry
-                try:
-                    audio = self.synth_chunk(chunk)
-                    break
-                except FatalSynthError:
-                    raise
-                except Exception as exc:
-                    last_error = exc
-                    audio = None
-            if audio is None or len(audio) == 0:
-                detail = f": {last_error}" if last_error else " (empty audio returned)"
-                raise ChunkSynthError(f"synthesis failed after 2 attempts for {chunk[:80]!r}{detail}") from last_error
+            audio = self.synth_chunk_with_retry(chunk)
             out.append(audio)
             if progress is not None:
                 progress(i + 1, len(chunks))
@@ -77,21 +82,7 @@ class BaseSynthesizer:
         for para in paragraphs:
             chunk_audios = []
             for chunk in para:
-                audio = None
-                last_error = None
-                for _attempt in range(2):  # one retry
-                    try:
-                        audio = self.synth_chunk(chunk)
-                        break
-                    except FatalSynthError:
-                        raise
-                    except Exception as exc:
-                        last_error = exc
-                        audio = None
-                if audio is None or len(audio) == 0:
-                    detail = f": {last_error}" if last_error else " (empty audio returned)"
-                    raise ChunkSynthError(
-                        f"synthesis failed after 2 attempts for {chunk[:80]!r}{detail}") from last_error
+                audio = self.synth_chunk_with_retry(chunk)
                 chunk_audios.append(audio)
                 done += 1
                 if progress is not None:
@@ -107,7 +98,9 @@ class BaseSynthesizer:
 
 class Synthesizer(BaseSynthesizer):
     def __init__(self, voice: str = "af_heart", lang_code: str = "a",
-                 device: str = "cuda", speed: float = 1.0):
+                 device: str | None = None, speed: float = 1.0):
+        if device is None:
+            device = select_device()
         from kokoro import KPipeline
         self.pipeline = KPipeline(lang_code=lang_code, device=device)
         self.voice = voice
@@ -116,3 +109,21 @@ class Synthesizer(BaseSynthesizer):
     def synth_chunk(self, text: str) -> np.ndarray:
         parts = [audio for _, _, audio in self.pipeline(text, voice=self.voice, speed=self.speed)]
         return concat_with_gaps(parts, gap_seconds=0.0)
+
+
+def select_device() -> str:
+    """Select the best available torch device, with an explicit env override."""
+    override = os.environ.get("T2A_DEVICE", "").strip().lower()
+    if override:
+        if override not in {"cuda", "mps", "cpu"}:
+            raise ValueError("T2A_DEVICE must be cuda, mps, or cpu")
+        return override
+    try:
+        import torch
+        if torch.cuda.is_available():
+            return "cuda"
+        if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+            return "mps"
+    except ImportError:
+        pass
+    return "cpu"
