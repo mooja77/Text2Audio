@@ -25,7 +25,7 @@ Double-click **`Install Text2Audio.bat`**.
 
 A black window opens and walks through the setup automatically:
 
-- Installs **Python** if you don't already have it.
+- Checks that Python 3.10-3.12 is installed (it tries to fetch it with winget if not, and tells you what to do if that fails).
 - Creates a private workspace for the app (a `.venv` folder) so it doesn't touch the
   rest of your system.
 - Detects whether you have an **NVIDIA graphics card**. If you do, it installs the fast
@@ -37,6 +37,17 @@ A black window opens and walks through the setup automatically:
 
 This first install downloads a fair amount and can take several minutes. Let it run
 until you see the green **"Done!"** message, then close the window.
+
+### Step 0: install Python 3.12 first (if you don't have it)
+
+Text2Audio needs a real copy of **Python 3.10, 3.11 or 3.12** (3.12 recommended; 3.13 and newer are not supported yet).
+
+1. Download Python 3.12 from <https://www.python.org/downloads/windows/> and run it.
+2. On the first screen, **tick "Add python.exe to PATH"**, then click **Install Now**.
+   (Or, in a terminal: `winget install Python.Python.3.12`.)
+3. Close any open black windows, then double-click **`Install Text2Audio.bat`**.
+
+If you see *"Python was not found; run without arguments to install from the Microsoft Store"*, that is only a Windows placeholder: Python is not installed yet. Do the steps above. The installer now checks for Python first and tells you if it is missing.
 
 ### "Windows protected your PC" (SmartScreen)
 
