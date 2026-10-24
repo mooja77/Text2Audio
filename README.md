@@ -27,8 +27,8 @@ It runs entirely offline on your own GPU using open text-to-speech models
 
 Don't want to touch a command line? On Windows you can be up and running in three steps:
 
-1. **[Download the project as a ZIP](https://github.com/mooja77/Text2Audio/archive/refs/heads/master.zip)** and unzip it somewhere (for example, your Desktop).
-2. Double-click **`Install Text2Audio.bat`**. It sets everything up for you — Python, the app and its dependencies, ffmpeg, and espeak-ng. The first run takes a while; just let it finish.
+1. **[Download the project as a ZIP](https://github.com/mooja77/Text2Audio/archive/refs/heads/master.zip)** and unzip it somewhere (for example, your Desktop). **You need Python 3.12 installed first** — get it from [python.org](https://www.python.org/downloads/windows/) and tick **"Add python.exe to PATH"** (or run `winget install Python.Python.3.12`).
+2. Double-click **`Install Text2Audio.bat`**. It checks for Python (3.10–3.12; if it's missing it tells you how to install it, see [INSTALL.md](INSTALL.md)), then sets up the app, its dependencies, ffmpeg, and espeak-ng. The first run takes a while; just let it finish.
 3. Double-click **`Start Text2Audio`** (the installer also adds a shortcut to your Desktop). Your browser opens the Studio — start making audiobooks. Keep the little black window open while you use the app; closing it stops Text2Audio.
 
 Inside Studio, the optional five-step beginner guide is resumable and dismissible:
