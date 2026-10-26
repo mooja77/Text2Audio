@@ -160,6 +160,15 @@ credits and room tone, listen to every chapter, and validate it with the distrib
 > A classic single-screen UI is also available. Install its optional dependency
 > with `pip install "text2audio[classic]"`, then run `python app.py` from a source checkout.
 
+### Unknown narrator voices
+
+If a render request names a voice that is neither a built-in preset nor a stored
+cloned voice (for example, the clone was deleted in another tab), the API
+answers **HTTP 422** with `{"error": "unknown voice", "voice": "<id>"}` and
+creates nothing in your library. Voice lookup now lives in one place
+(`backend/render.py::resolve_synthesizer`). No new models or libraries were
+added, and nothing here touches the network.
+
 ### Chapter markers
 
 For one-file-per-chapter imports, each file's first `# Heading` becomes the
