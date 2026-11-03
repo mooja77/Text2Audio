@@ -6,6 +6,13 @@ All notable changes to Text2Audio are recorded here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- `backend/offline.py`: when the models are cached, `HF_HUB_OFFLINE`,
+  `TRANSFORMERS_OFFLINE` and `HF_HUB_DISABLE_TELEMETRY` are set at the top of
+  `server.py` and `pipeline/f5_worker.py`, before any Hugging Face import. A
+  GPU-free test fails if a mocked render opens any socket.
+
 ### Documentation
 
 - `docs/LICENSES.md`: every model, dataset and library licence verified live at

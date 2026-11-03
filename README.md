@@ -171,6 +171,16 @@ same answer. Before v1.4.0 both endpoints answered HTTP 400. Voice lookup now li
 (`backend/render.py::resolve_synthesizer`). No new models or libraries were
 added, and nothing here touches the network.
 
+### Offline after the first download
+
+Once the Kokoro model is in the Hugging Face cache, Text2Audio sets
+`HF_HUB_OFFLINE` and `TRANSFORMERS_OFFLINE` at startup, before any model library
+is imported, so a render opens no network connections. On the very first run the
+model is not cached yet, so the app stays online to download it; the offline
+setting applies from the next start. The cloning worker does the same once the
+F5-TTS and Vocos files are cached. `tests/test_render.py` checks that a mocked
+render never opens a socket.
+
 ### Chapter markers
 
 For one-file-per-chapter imports, each file's first `# Heading` becomes the

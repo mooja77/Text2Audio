@@ -189,6 +189,54 @@ def test_real_chunk_interface_streams_progress_and_uses_cache(tmp_path):
     assert any(event.get("chunkCount") for event in events)
 
 
+def _block_network(monkeypatch):
+    import socket
+    attempts = []
+
+    def deny(*args, **kwargs):
+        attempts.append(args)
+        raise AssertionError("network access attempted")
+
+    monkeypatch.setattr(socket, "socket", deny)
+    monkeypatch.setattr(socket, "create_connection", deny)
+    monkeypatch.setattr(socket, "getaddrinfo", deny)
+    return attempts
+
+
+def test_socket_guard_trips_on_connect(monkeypatch):
+    import socket
+    import pytest
+    attempts = _block_network(monkeypatch)
+    with pytest.raises(AssertionError, match="network access attempted"):
+        socket.create_connection(("127.0.0.1", 9))
+    assert len(attempts) == 1
+
+
+def test_cached_render_sets_offline_and_opens_no_sockets(tmp_path, monkeypatch):
+    from backend.offline import configure_at_startup
+    hub = tmp_path / "hub"
+    (hub / "models--hexgrad--Kokoro-82M" / "snapshots" / "abc").mkdir(parents=True)
+    env = {"HF_HUB_CACHE": str(hub)}
+    configure_at_startup(env)
+    assert env["HF_HUB_OFFLINE"] == "1" and env["TRANSFORMERS_OFFLINE"] == "1"
+
+    attempts = _block_network(monkeypatch)
+    lib = Library(str(tmp_path / "library"))
+    manifest = render_audiobook(
+        book_text="## Chapter 1 - One\nChapter 1. One.\n\nHello.", voice="af_heart",
+        speed=1.0, title="T", author="", cover_path=None, library=lib, job_id="off1",
+        emit=lambda e: None, synth_factory=FakeSynth)
+    assert manifest["id"] == "off1"
+    assert attempts == []
+
+
+def test_uncached_models_stay_online(tmp_path):
+    from backend.offline import configure_at_startup
+    env = {"HF_HUB_CACHE": str(tmp_path / "empty")}
+    assert configure_at_startup(env) == {}
+    assert "HF_HUB_OFFLINE" not in env and "TRANSFORMERS_OFFLINE" not in env
+
+
 def test_cancelled_render_removes_partial_work(tmp_path):
     import pytest
     from backend.render import RenderCancelled
