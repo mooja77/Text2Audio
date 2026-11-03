@@ -387,3 +387,13 @@ def test_licenses_lists_in_use_components(client):
 def test_server_has_callable_main():
     import server
     assert callable(server.main)
+
+
+def test_licence_record_ships_in_the_wheel():
+    """/api/licenses reads docs/LICENSES.md, so the wheel must include it (3.10-safe: no tomllib)."""
+    import re
+    from pathlib import Path
+    text = (Path(__file__).resolve().parent.parent / "pyproject.toml").read_text(encoding="utf-8")
+    wheel = text[text.index("[tool.hatch.build.targets.wheel]"):]
+    include = re.search(r"include\s*=\s*\[(.*?)\]", wheel, re.S).group(1)
+    assert '"docs/LICENSES.md"' in include
