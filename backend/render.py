@@ -184,6 +184,9 @@ def _render_into(workdir, chapters, *, voice, speed, title, author, cover_path,
         "chapters": chapters_meta, "coverFile": "cover.jpg" if cover_dest else None,
         "wavKept": True, "wavFiles": wav_files, "bitrate": DEFAULT_BITRATE, "mastered": True,
     }
+    if voice not in PRESET_VOICES:  # a stored clone (F5-TTS weights, CC-BY-NC-4.0)
+        manifest["license"] = "non-commercial (F5-TTS CC-BY-NC-4.0)"
+        manifest["licenseAttribution"] = "SWivid/F5-TTS"
     library.save_manifest(job_id, manifest)
     emit({"type": "done", "libraryId": job_id, "percent": 100})
     return manifest

@@ -180,8 +180,17 @@ model is not cached yet, so the app stays online to download it; the offline
 setting applies from the next start. Choosing a narrator voice you have not used
 before still works on a connected PC: that one voice file is downloaded once. If
 you set `HF_HUB_OFFLINE` yourself, Text2Audio leaves it alone. The cloning worker does the same once the
-F5-TTS and Vocos files are cached. `tests/test_render.py` checks that a mocked
+F5-TTS and Vocos files are cached, and it is started with the offline
+settings passed explicitly. `tests/test_render.py` checks that a mocked
 render never opens a socket.
+
+### First-run checklist and error messages
+
+Studio shows a short setup checklist at the top of the page covering ffmpeg,
+espeak-ng, the voice-model download and free disk space (2 GB). Each item that
+needs attention says what to do. The same list is returned by `GET /api/health`
+as `checklist` (with `ready` true when every item passes). Errors in the UI are
+shown in plain language, never as raw stack traces.
 
 ### Chapter markers
 

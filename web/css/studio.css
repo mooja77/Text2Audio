@@ -132,6 +132,16 @@ main:focus{outline:none}
 .lic-table th,.lic-table td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--bd);vertical-align:top}
 .lic-table thead th{color:var(--mut);font-weight:600}
 
+/* First-run checklist */
+.firstrun{max-width:1100px;margin:12px auto 0;padding:0 20px}
+.fr-title{font-size:16px;margin:0 0 8px}
+.fr-list{list-style:none;margin:0;padding:12px 14px;background:var(--panel);border:1px solid var(--bd);border-radius:12px;display:grid;gap:10px}
+.fr-list li.bad{border-left:4px solid var(--err);padding-left:10px}
+.fr-list li.ok{border-left:4px solid var(--ok);padding-left:10px}
+.fr-state{font-weight:700}
+.fr-action{margin-top:4px;color:var(--tx)}
+.fr-ready{margin:0;color:var(--tx)}
+
 @media(max-width:640px){
   .topbar{gap:8px;flex-wrap:wrap}.tabs{order:3;width:100%;overflow-x:auto}.tab{white-space:nowrap}
 }
