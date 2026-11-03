@@ -31,6 +31,7 @@ from backend.render import render_audiobook, remaster, purge_wavs, retag_audio
 from backend.render import UnknownVoiceError, resolve_synthesizer, validate_voice
 from backend.pronunciations import PronunciationStore
 from backend.voices import VoiceStore
+from backend.consent import read_consent, write_consent, LICENSE, ATTRIBUTION
 from backend.quality import build_chapter_export, quality_report
 from backend.cache import ChunkCache
 from pipeline.clone_synth import ClonedSynthesizer
@@ -52,6 +53,8 @@ cache = ChunkCache(os.environ.get("T2A_CACHE_DIR",
                    os.path.join(os.path.dirname(LIBRARY_DIR), "data", "chunk-cache")),
                    max_bytes=int(os.environ.get("T2A_CACHE_MAX_BYTES", str(5 * 1024**3))))
 jobs = JobManager()
+CONSENT_PATH = os.environ.get("T2A_CONSENT_PATH",
+                              os.path.join(os.path.dirname(LIBRARY_DIR), "data", "clone-consent.json"))
 _render_lock = threading.Lock()      # one GPU render at a time
 _maintenance_lock = threading.Lock()
 
@@ -476,9 +479,34 @@ def parse_text_preview(req: ParseTextRequest):
                          for i, chapter in enumerate(chapters)]}
 
 
+class ConsentRequest(BaseModel):
+    acknowledged: bool = False
+
+
+@app.get("/api/clone-consent")
+def clone_consent_get():
+    return {**read_consent(CONSENT_PATH), "license": LICENSE, "attribution": ATTRIBUTION}
+
+
+@app.post("/api/clone-consent")
+def clone_consent_set(req: ConsentRequest):
+    if req.acknowledged is not True:
+        return JSONResponse(status_code=422, content={
+            "detail": "acknowledged must be true", "error": "bad_request"})
+    try:
+        return write_consent(CONSENT_PATH, True)
+    except OSError:
+        return JSONResponse(status_code=500, content={
+            "detail": "could not persist consent", "error": "server_error"})
+
+
 @app.post("/api/voices/clone")
 async def voices_clone(name: str = Form(...), audio: UploadFile = File(...),
                        refText: str = Form("")):
+    if not read_consent(CONSENT_PATH)["acknowledged"]:
+        return JSONResponse(status_code=403, content={
+            "detail": "clone licence not acknowledged", "error": "consent_required",
+            "license": LICENSE, "attribution": ATTRIBUTION})
     if not name.strip() or len(name.strip()) > 200:
         raise HTTPException(status_code=400, detail="name is required")
     if len(refText) > 10_000:

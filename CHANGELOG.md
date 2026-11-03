@@ -28,6 +28,17 @@ All notable changes to Text2Audio are recorded here. The format follows
   the GPLv3 ffmpeg build the installer uses, LGPL `num2words`/libsndfile, and a
   credits block.
 
+### Changed (voice cloning licence)
+
+- The clone panel now says, before anything else, that cloned voices can't be used
+  in audiobooks you sell, and names the F5-TTS weights licence (CC-BY-NC-4.0,
+  SWivid/F5-TTS) with links. A one-time acknowledgement is stored server-side in
+  `data/clone-consent.json` (`GET`/`POST /api/clone-consent`).
+  `POST /api/voices/clone` answers **HTTP 403** (`consent_required`) and creates
+  nothing until it is acknowledged.
+- A book rendered with a cloned voice records `license: "non-commercial (F5-TTS
+  CC-BY-NC-4.0)"` and `licenseAttribution: "SWivid/F5-TTS"` in its `manifest.json`.
+
 ### Changed (API)
 
 - **Unknown narrator voices now return HTTP 422 instead of HTTP 400** on

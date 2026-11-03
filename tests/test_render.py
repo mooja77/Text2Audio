@@ -293,6 +293,24 @@ def test_uncached_models_stay_online(tmp_path):
     assert "HF_HUB_OFFLINE" not in env and "TRANSFORMERS_OFFLINE" not in env
 
 
+def test_cloned_voice_render_records_noncommercial_license(tmp_path):
+    lib = Library(str(tmp_path))
+    m = render_audiobook(book_text="## A\n\nHi.", voice="v0a1b2c3d4", speed=1.0, title="T",
+                         author="", cover_path=None, library=lib, job_id="lic1",
+                         emit=lambda e: None, synth_factory=FakeSynth)
+    assert m["license"] == "non-commercial (F5-TTS CC-BY-NC-4.0)"
+    assert m["licenseAttribution"] == "SWivid/F5-TTS"
+    assert lib.get("lic1")["license"] == m["license"]
+
+
+def test_preset_voice_render_has_no_license_field(tmp_path):
+    lib = Library(str(tmp_path))
+    m = render_audiobook(book_text="## A\n\nHi.", voice="af_heart", speed=1.0, title="T",
+                         author="", cover_path=None, library=lib, job_id="lic2",
+                         emit=lambda e: None, synth_factory=FakeSynth)
+    assert "license" not in m and "licenseAttribution" not in m
+
+
 def test_cancelled_render_removes_partial_work(tmp_path):
     import pytest
     from backend.render import RenderCancelled
