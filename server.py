@@ -15,7 +15,7 @@ import soundfile as sf
 from pathlib import Path
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse, Response, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 from starlette.background import BackgroundTask
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -24,6 +24,7 @@ from pipeline.synth import Synthesizer, PRESET_VOICES, SAMPLE_RATE, select_devic
 from backend.library import Library, new_id
 from backend.jobs import JobManager
 from backend.render import render_audiobook, remaster, purge_wavs, retag_audio
+from backend.render import UnknownVoiceError, resolve_synthesizer, validate_voice
 from backend.pronunciations import PronunciationStore
 from backend.voices import VoiceStore
 from backend.quality import build_chapter_export, quality_report
@@ -103,13 +104,18 @@ def voices_payload() -> list[dict]:
     return out
 
 
+def _unknown_voice_response(voice_id):
+    """One response for every endpoint that is given an unknown narrator voice.
+
+    ``detail`` keeps the shape FastAPI errors use elsewhere in this API, so
+    callers that read ``detail`` keep working; ``error``/``voice`` are the
+    machine-readable fields."""
+    return JSONResponse(status_code=422, content={
+        "detail": "unknown voice", "error": "unknown voice", "voice": voice_id})
+
+
 def resolve_synth(voice_id, speed):
-    if voice_id in PRESET_VOICES:
-        return Synthesizer(voice=voice_id, lang_code=PRESET_VOICES[voice_id], speed=float(speed))
-    meta = voices.get(voice_id)
-    if meta is None:
-        raise KeyError(voice_id)
-    return ClonedSynthesizer(voices.ref_path(voice_id), meta.get("refText", ""), float(speed))
+    return resolve_synthesizer(voice_id, speed, voices)
 
 
 SYNTH_FACTORY = resolve_synth
@@ -184,8 +190,11 @@ async def ingest(files: list[UploadFile] = File(...)):
 def _launch_render(req: RenderRequest, cover_data: bytes | None = None):
     if not req.bookText.strip() or not parse_chapters(req.bookText, default_title=req.title or "Audiobook"):
         raise HTTPException(status_code=400, detail="book contains no readable text")
-    if req.voice not in PRESET_VOICES and voices.get(req.voice) is None:
-        raise HTTPException(status_code=400, detail="unknown voice")
+    try:
+        validate_voice(req.voice, voices)
+    except UnknownVoiceError as exc:
+        # Checked before any library directory is created: no side effects.
+        return _unknown_voice_response(exc.voice_id)
     # Serialize renders: concurrent GPU inference from two threads is unsafe.
     if not _render_lock.acquire(blocking=False):
         raise HTTPException(status_code=409, detail="A render is already in progress")
@@ -384,8 +393,10 @@ _PREVIEW_TEXT = "This is a sample of the selected narrator voice."
 
 @app.post("/api/voice-preview")
 def voice_preview(req: PreviewRequest):
-    if req.voice not in PRESET_VOICES and voices.get(req.voice) is None:
-        raise HTTPException(status_code=400, detail="unknown voice")
+    try:
+        validate_voice(req.voice, voices)
+    except UnknownVoiceError as exc:
+        return _unknown_voice_response(exc.voice_id)
     if not _render_lock.acquire(blocking=False):
         raise HTTPException(status_code=409, detail="A render is already in progress")
     synth = None

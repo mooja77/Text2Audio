@@ -13,6 +13,7 @@ from pipeline.synth import Synthesizer, PRESET_VOICES, SAMPLE_RATE
 from pipeline.synth import SENTENCE_GAP, PARAGRAPH_GAP
 from pipeline.assemble import write_wav, build_m4b, DEFAULT_BITRATE
 from pipeline.normalize import normalize_text
+from pipeline.clone_synth import ClonedSynthesizer
 
 WAV_SUBDIR = "wav"
 
@@ -23,6 +24,37 @@ class RenderCancelled(Exception):
 
 def _default_synth_factory(voice_id, speed):
     return Synthesizer(voice=voice_id, lang_code=PRESET_VOICES[voice_id], speed=float(speed))
+
+
+class UnknownVoiceError(ValueError):
+    """voice id is neither a preset nor a valid stored clone.
+
+    The API boundary maps this to HTTP 422."""
+
+    def __init__(self, voice_id):
+        super().__init__(voice_id)
+        self.voice_id = voice_id
+
+
+def validate_voice(voice_id, voice_store) -> None:
+    """Raise UnknownVoiceError unless voice_id is a preset or a stored clone."""
+    if voice_id in PRESET_VOICES:
+        return
+    if voice_store.get(voice_id) is None:
+        raise UnknownVoiceError(voice_id)
+
+
+def resolve_synthesizer(voice_id, speed, voice_store, factory=_default_synth_factory):
+    """Return a ready synthesizer for voice_id (preset -> Kokoro, clone -> F5).
+
+    Raises UnknownVoiceError (never KeyError) for any other id.
+    """
+    if voice_id in PRESET_VOICES:
+        return factory(voice_id, speed)
+    meta = voice_store.get(voice_id)
+    if meta is None:
+        raise UnknownVoiceError(voice_id)
+    return ClonedSynthesizer(voice_store.ref_path(voice_id), meta.get("refText", ""), float(speed))
 
 
 def _wav_dir(library, job_id: str) -> str:

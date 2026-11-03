@@ -165,9 +165,9 @@ def test_voice_preview_returns_wav(client, monkeypatch):
     assert len(r.content) > 44  # more than a bare WAV header
 
 
-def test_unknown_voice_render_returns_400(client):
+def test_unknown_voice_render_returns_422(client):
     r = client.post("/api/render", json={"bookText": "## A\n\nhi", "voice": "nope"})
-    assert r.status_code == 400
+    assert r.status_code == 422
 
 
 def test_render_rejects_whitespace_only_book(client):
@@ -368,8 +368,8 @@ def test_render_with_cloned_voice(client, monkeypatch):
     assert r.status_code == 200
 
 
-def test_render_unknown_voice_still_400(client):
-    assert client.post("/api/render", json={"bookText": "## A\n\nhi", "voice": "nope"}).status_code == 400
+def test_render_unknown_voice_still_422(client):
+    assert client.post("/api/render", json={"bookText": "## A\n\nhi", "voice": "nope"}).status_code == 422
 
 
 def test_server_has_callable_main():
