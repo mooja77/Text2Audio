@@ -58,12 +58,18 @@ def _resample(wav: np.ndarray, sr_in: int, sr_out: int) -> np.ndarray:
     return np.interp(x, np.arange(len(wav)), wav).astype(np.float32)
 
 
+def _worker_env() -> dict:
+    """Explicit copy of the environment, so the worker gets the offline flags
+    set at startup rather than relying on implicit inheritance."""
+    return dict(os.environ)
+
+
 def _start_worker():
     """Spawn the isolated F5 worker; raise a clear error if F5 can't load."""
     proc = subprocess.Popen(
         [sys.executable, "-m", "pipeline.f5_worker"],
         stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True, bufsize=1,
-        cwd=_PROJECT_ROOT)
+        cwd=_PROJECT_ROOT, env=_worker_env())
     while True:
         try:
             line = _readline_with_timeout(proc.stdout, WORKER_START_TIMEOUT)
