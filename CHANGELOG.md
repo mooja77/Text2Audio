@@ -6,6 +6,16 @@ All notable changes to Text2Audio are recorded here. The format follows
 
 ## [Unreleased]
 
+### Documentation
+
+- `docs/LICENSES.md`: every model, dataset and library licence verified live at
+  a pinned upstream revision (2026-11-03), with quotes and a verdict for each.
+  Kokoro narration is Apache-2.0 and clean; the optional F5-TTS cloning weights
+  are CC-BY-NC-4.0 (non-commercial). `THIRD_PARTY_LICENSES.md` corrected: the
+  GPL `espeak-ng.dll` and `phonemizer-fork` that Kokoro's dependencies install,
+  the GPLv3 ffmpeg build the installer uses, LGPL `num2words`/libsndfile, and a
+  credits block.
+
 ### Changed (API)
 
 - **Unknown narrator voices now return HTTP 422 instead of HTTP 400** on
