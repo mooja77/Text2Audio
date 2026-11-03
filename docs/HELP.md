@@ -37,7 +37,7 @@ Studio can be used with the keyboard alone: Tab / Shift+Tab move between control
 
 ## Privacy and safe support
 
-The server binds to `127.0.0.1`. Manuscripts, generated audio, cloned voices, and manifests stay on this computer. Text2Audio has no account system, telemetry, lifecycle email, or hosted processing.
+The server binds to `127.0.0.1` only; there is no setting to change this, and `GET /api/health` reports the bind address (`"bind": "127.0.0.1:8765"`). Manuscripts, generated audio, cloned voices, and manifests stay on this computer. Text2Audio has no account system, telemetry, lifecycle email, or hosted processing.
 
 GitHub issues are public. Do not attach private manuscripts, cloned voices, copyrighted source text, or logs containing private text. Use the synthetic example or another tiny synthetic reproduction.
 
