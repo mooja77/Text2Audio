@@ -177,7 +177,9 @@ Once the Kokoro model is in the Hugging Face cache, Text2Audio sets
 `HF_HUB_OFFLINE` and `TRANSFORMERS_OFFLINE` at startup, before any model library
 is imported, so a render opens no network connections. On the very first run the
 model is not cached yet, so the app stays online to download it; the offline
-setting applies from the next start. The cloning worker does the same once the
+setting applies from the next start. Choosing a narrator voice you have not used
+before still works on a connected PC: that one voice file is downloaded once. If
+you set `HF_HUB_OFFLINE` yourself, Text2Audio leaves it alone. The cloning worker does the same once the
 F5-TTS and Vocos files are cached. `tests/test_render.py` checks that a mocked
 render never opens a socket.
 

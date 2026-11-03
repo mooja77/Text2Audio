@@ -215,7 +215,10 @@ def test_socket_guard_trips_on_connect(monkeypatch):
 def test_cached_render_sets_offline_and_opens_no_sockets(tmp_path, monkeypatch):
     from backend.offline import configure_at_startup
     hub = tmp_path / "hub"
-    (hub / "models--hexgrad--Kokoro-82M" / "snapshots" / "abc").mkdir(parents=True)
+    snap = hub / "models--hexgrad--Kokoro-82M" / "snapshots" / "abc"
+    snap.mkdir(parents=True)
+    for name in ("config.json", "kokoro-v1_0.pth"):
+        (snap / name).write_bytes(b"x")
     env = {"HF_HUB_CACHE": str(hub)}
     configure_at_startup(env)
     assert env["HF_HUB_OFFLINE"] == "1" and env["TRANSFORMERS_OFFLINE"] == "1"
@@ -228,6 +231,59 @@ def test_cached_render_sets_offline_and_opens_no_sockets(tmp_path, monkeypatch):
         emit=lambda e: None, synth_factory=FakeSynth)
     assert manifest["id"] == "off1"
     assert attempts == []
+
+
+def _kokoro_cache(tmp_path, files=("config.json", "kokoro-v1_0.pth"), voices=()):
+    snap = tmp_path / "hub" / "models--hexgrad--Kokoro-82M" / "snapshots" / "abc"
+    (snap / "voices").mkdir(parents=True)
+    for name in files:
+        (snap / name).write_bytes(b"x")
+    for v in voices:
+        (snap / "voices" / f"{v}.pt").write_bytes(b"x")
+    return {"HF_HUB_CACHE": str(tmp_path / "hub")}
+
+
+def test_partial_snapshot_is_not_treated_as_cached(tmp_path):
+    from backend.offline import configure_at_startup
+    env = _kokoro_cache(tmp_path, files=("config.json",))  # interrupted first download
+    assert configure_at_startup(env) == {}
+    assert "HF_HUB_OFFLINE" not in env
+
+
+def test_user_offline_setting_is_respected(tmp_path):
+    from backend.offline import configure_at_startup
+    env = _kokoro_cache(tmp_path)
+    env["HF_HUB_OFFLINE"] = "0"
+    assert configure_at_startup(env) == {}
+    assert env["HF_HUB_OFFLINE"] == "0"
+
+
+def test_new_voice_is_fetched_once_when_we_forced_offline(tmp_path, monkeypatch):
+    import types
+    import backend.offline as off
+    constants = types.SimpleNamespace(HF_HUB_OFFLINE=True)  # stands in for huggingface_hub.constants
+    env = _kokoro_cache(tmp_path, voices=("af_heart",))
+    monkeypatch.setattr(off.os, "environ", env)
+    monkeypatch.setattr(off, "_forced", True)
+    seen = []
+
+    def fake_download(repo_id, filename):
+        seen.append((repo_id, filename, constants.HF_HUB_OFFLINE))
+
+    assert off.ensure_voice_available("af_heart", download=fake_download, hub_constants=constants) is False  # cached
+    assert off.ensure_voice_available("am_adam", download=fake_download, hub_constants=constants) is True
+    assert seen == [("hexgrad/Kokoro-82M", "voices/am_adam.pt", False)]  # online only during the call
+    assert constants.HF_HUB_OFFLINE is True  # restored afterwards
+
+
+def test_new_voice_not_fetched_when_offline_was_not_forced_by_us(tmp_path, monkeypatch):
+    import backend.offline as off
+    env = _kokoro_cache(tmp_path)
+    monkeypatch.setattr(off.os, "environ", env)
+    monkeypatch.setattr(off, "_forced", False)
+    called = []
+    assert off.ensure_voice_available("am_adam", download=lambda **k: called.append(k)) is False
+    assert called == []
 
 
 def test_uncached_models_stay_online(tmp_path):
