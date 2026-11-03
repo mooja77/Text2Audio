@@ -202,6 +202,9 @@ def _launch_render(req: RenderRequest, cover_data: bytes | None = None):
     except UnknownVoiceError as exc:
         # Checked before any library directory is created: no side effects.
         return _unknown_voice_response(exc.voice_id)
+    refusal = _clone_consent_refusal(req.voice)
+    if refusal is not None:  # before any library directory is created
+        return refusal
     # Serialize renders: concurrent GPU inference from two threads is unsafe.
     if not _render_lock.acquire(blocking=False):
         raise HTTPException(status_code=409, detail="A render is already in progress")
@@ -404,6 +407,9 @@ def voice_preview(req: PreviewRequest):
         validate_voice(req.voice, voices)
     except UnknownVoiceError as exc:
         return _unknown_voice_response(exc.voice_id)
+    refusal = _clone_consent_refusal(req.voice)
+    if refusal is not None:
+        return refusal
     if not _render_lock.acquire(blocking=False):
         raise HTTPException(status_code=409, detail="A render is already in progress")
     synth = None
@@ -481,6 +487,18 @@ def parse_text_preview(req: ParseTextRequest):
 
 class ConsentRequest(BaseModel):
     acknowledged: bool = False
+
+
+def _clone_consent_refusal(voice_id):
+    """403 for a stored-clone voice until the F5-TTS licence is acknowledged.
+
+    Covers clones that were never created through the gate (for example a
+    voices folder restored from a backup), not only POST /api/voices/clone."""
+    if voice_id in PRESET_VOICES or read_consent(CONSENT_PATH)["acknowledged"]:
+        return None
+    return JSONResponse(status_code=403, content={
+        "detail": "clone licence not acknowledged", "error": "consent_required",
+        "license": LICENSE, "attribution": ATTRIBUTION})
 
 
 @app.get("/api/clone-consent")

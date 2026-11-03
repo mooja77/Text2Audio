@@ -35,9 +35,12 @@ All notable changes to Text2Audio are recorded here. The format follows
   SWivid/F5-TTS) with links. A one-time acknowledgement is stored server-side in
   `data/clone-consent.json` (`GET`/`POST /api/clone-consent`).
   `POST /api/voices/clone` answers **HTTP 403** (`consent_required`) and creates
-  nothing until it is acknowledged.
+  nothing until it is acknowledged. Rendering or previewing with a stored clone
+  (`/api/render`, `/api/render-upload`, `/api/voice-preview`) is refused the same
+  way, so a voices folder restored from a backup cannot bypass the notice.
 - A book rendered with a cloned voice records `license: "non-commercial (F5-TTS
-  CC-BY-NC-4.0)"` and `licenseAttribution: "SWivid/F5-TTS"` in its `manifest.json`.
+  CC-BY-NC-4.0)"` and `licenseAttribution: "SWivid/F5-TTS"` in its `manifest.json`,
+  and the Library shows a "do not sell" note on that book.
 
 ### Changed (API)
 

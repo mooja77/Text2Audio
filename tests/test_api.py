@@ -410,3 +410,20 @@ def test_render_unknown_voice_still_422(client):
 def test_server_has_callable_main():
     import server
     assert callable(server.main)
+
+
+def test_render_and_preview_with_clone_need_consent_even_if_clone_was_not_made_through_the_gate(client, monkeypatch):
+    """A clone restored from a backup must not bypass the CC-BY-NC notice."""
+    import os
+    import server
+    monkeypatch.setattr(server, "SYNTH_FACTORY", _FakeSynth)
+    _ack(client)
+    files = {"audio": ("ref.wav", _wav_bytes(), "audio/wav")}
+    vid = client.post("/api/voices/clone", files=files, data={"name": "Restored"}).json()["id"]
+    os.remove(server.CONSENT_PATH)  # e.g. voices folder copied to a new PC
+    before = sorted(os.listdir(server.library.base))
+    r = client.post("/api/render", json={"bookText": "## A\n\nhi", "voice": vid})
+    assert r.status_code == 403 and r.json()["error"] == "consent_required"
+    assert sorted(os.listdir(server.library.base)) == before
+    assert client.post("/api/voice-preview", json={"voice": vid}).status_code == 403
+    assert client.post("/api/render", json={"bookText": "## A\n\nhi", "voice": "af_heart"}).status_code == 200
