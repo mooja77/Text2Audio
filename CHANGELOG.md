@@ -30,6 +30,20 @@ All notable changes to Text2Audio are recorded here. The format follows
   the GPLv3 ffmpeg build the installer uses, LGPL `num2words`/libsndfile, and a
   credits block.
 
+### Changed (voice cloning licence)
+
+- The clone panel now says, before anything else, that cloned voices can't be used
+  in audiobooks you sell, and names the F5-TTS weights licence (CC-BY-NC-4.0,
+  SWivid/F5-TTS) with links. A one-time acknowledgement is stored server-side in
+  `data/clone-consent.json` (`GET`/`POST /api/clone-consent`).
+  `POST /api/voices/clone` answers **HTTP 403** (`consent_required`) and creates
+  nothing until it is acknowledged. Rendering or previewing with a stored clone
+  (`/api/render`, `/api/render-upload`, `/api/voice-preview`) is refused the same
+  way, so a voices folder restored from a backup cannot bypass the notice.
+- A book rendered with a cloned voice records `license: "non-commercial (F5-TTS
+  CC-BY-NC-4.0)"` and `licenseAttribution: "SWivid/F5-TTS"` in its `manifest.json`,
+  and the Library shows a "do not sell" note on that book.
+
 ### Security
 
 - The server only ever binds `127.0.0.1`. `server.main()` calls `assert_loopback()` and refuses to start on any other host; a test fails if `main()` would bind a non-loopback host. `GET /api/health` now includes `bind` (e.g. `127.0.0.1:8765`).

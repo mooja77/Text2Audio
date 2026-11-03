@@ -19,6 +19,11 @@ links and verdicts, is in [`docs/LICENSES.md`](docs/LICENSES.md).
 | **F5-TTS** — model weights (`F5TTS_v1_Base`) | Voice cloning (optional) | **CC-BY-NC-4.0** | **Non-commercial.** Upstream: "The pre-trained models are licensed under the CC-BY-NC license due to the training data Emilia". Audio made with a cloned voice must not be used commercially. |
 | **Vocos** (`charactr/vocos-mel-24khz`, `gemelo-ai/vocos`) | F5-TTS vocoder | MIT | |
 
+> **In-app gate:** the clone panel names CC-BY-NC-4.0 and SWivid/F5-TTS, the
+> server refuses to create a cloned voice until the user has acknowledged the
+> notice once, and books rendered with a cloned voice carry
+> "non-commercial (F5-TTS CC-BY-NC-4.0)" in their manifest.
+>
 > **Commercial use of voice cloning:** the default F5-TTS weights are CC-BY-NC
 > (non-commercial). For commercial cloning you would need permissively-licensed
 > weights — none is wired in by default. Narration with the built-in Kokoro
