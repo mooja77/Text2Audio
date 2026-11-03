@@ -1,5 +1,5 @@
 """Text2Audio Studio — FastAPI backend serving the web UI over the TTS pipeline."""
-from backend.offline import configure_at_startup
+from backend.offline import configure_at_startup, models_cached
 
 OFFLINE_STATE = configure_at_startup()  # must run before huggingface_hub/transformers are imported
 
@@ -34,6 +34,7 @@ from backend.voices import VoiceStore
 from backend.consent import read_consent, write_consent, LICENSE, ATTRIBUTION
 from backend.quality import build_chapter_export, quality_report
 from backend.cache import ChunkCache
+from backend.firstrun import first_run_checklist
 from pipeline.clone_synth import ClonedSynthesizer
 from pipeline.normalize import normalize_text, BUILTIN_PRONUNCIATIONS
 from pipeline.ingest import build_book_text
@@ -167,8 +168,10 @@ async def reject_cross_site_mutations(request: Request, call_next):
 def health():
     ffmpeg = shutil.which("ffmpeg")
     espeak = shutil.which("espeak-ng") or os.environ.get("PHONEMIZER_ESPEAK_PATH")
+    items = first_run_checklist(bool(ffmpeg), bool(espeak), models_cached(), LIBRARY_DIR)
     return {"status": "ok", "bind": f"{BIND_HOST}:{BIND_PORT}",
             "ffmpeg": bool(ffmpeg), "espeak": bool(espeak),
+            "checklist": items, "ready": all(i["ok"] for i in items),
             "libraryWritable": os.access(LIBRARY_DIR, os.W_OK),
             "voiceCloning": importlib.util.find_spec("f5_tts") is not None,
             "device": select_device(),

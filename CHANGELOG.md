@@ -30,6 +30,11 @@ All notable changes to Text2Audio are recorded here. The format follows
   the GPLv3 ffmpeg build the installer uses, LGPL `num2words`/libsndfile, and a
   credits block.
 
+### Changed (UX)
+
+- First-run checklist (ffmpeg, espeak-ng, model download, free disk space) returned by `GET /api/health` as `checklist`/`ready` and shown at the top of Studio, with a next step for each failing item.
+- Errors shown in the UI are plain language; raw stack text and JSON are never displayed. Render error events keep `message` and add `friendly`.
+
 ### Changed (voice cloning licence)
 
 - The clone panel now says, before anything else, that cloned voices can't be used

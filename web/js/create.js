@@ -261,7 +261,7 @@ const Create = {
         T2A.state.firstValue = true; Onboarding.complete();
         T2A.toast(resumed ? "Render recovered — audiobook ready" : "Audiobook ready"); T2A.showTab("library");
       } else if (e.type === "error") {
-        const msg = "Error: " + (e.message || "render failed");
+        const msg = e.friendly || T2A.friendly(e.message);
         document.getElementById("pmsg").textContent = msg; T2A.alert(msg);
         src.close(); gen.disabled = false; localStorage.removeItem("text2audio.activeJob");
         T2A.state.activeJob = null; T2A.state.activeSource = null;

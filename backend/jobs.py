@@ -4,6 +4,8 @@ import json
 import threading
 import time
 
+from backend.firstrun import friendly_error
+
 
 class JobManager:
     def __init__(self, retention_seconds: float = 3600):
@@ -39,7 +41,7 @@ class JobManager:
             try:
                 target(emit)
             except Exception as exc:
-                emit({"type": "error", "message": str(exc)})
+                emit({"type": "error", "message": str(exc), "friendly": friendly_error(exc)})
             finally:
                 with self._lock:
                     state["complete"] = True

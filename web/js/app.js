@@ -9,9 +9,38 @@ const T2A = {
     return String(s ?? "").replace(/[&<>"']/g,
       c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   },
+  // Plain-language text for any server error; never raw JSON or stack text.
+  friendly(text, status) {
+    let detail = String(text || "");
+    try { const j = JSON.parse(detail); detail = String(j.detail ?? j.error ?? ""); } catch {}
+    const rules = [
+      [/unknown voice/i, "That narrator voice is no longer available. Pick another voice and try again."],
+      [/already in progress/i, "Another audiobook is being made right now. Wait for it to finish, then try again."],
+      [/too large/i, "That file is too large."],
+      [/could not read that audio/i, "We could not read that audio file. Try a different recording."],
+      [/between 1 and 120 seconds/i, "The voice sample must be between 1 and 120 seconds long."],
+      [/no readable text|no readable chapters/i, "We could not find any readable text. Check the file and try again."],
+      [/could not import|supported manuscript types/i, "That file type is not supported. Use .txt, Markdown, DOCX, EPUB or PDF."],
+    ];
+    for (const [re, msg] of rules) if (re.test(detail)) return msg;
+    if (status === 404) return "We could not find that item. It may have been deleted.";
+    if (detail && detail.length < 120 && !/traceback|error|exception|\.py|file "/i.test(detail)) return detail;
+    return "Something went wrong. Please try again. If it keeps happening, check the setup checklist at the top of the page.";
+  },
+  renderChecklist(items) {
+    const box = document.getElementById("firstrun");
+    if (!box || !Array.isArray(items)) return;
+    box.hidden = false;
+    if (items.every(i => i.ok)) {
+      box.innerHTML = `<p class="fr-ready">✓ Ready: everything Text2Audio needs is set up.</p>`;
+      return;
+    }
+    box.innerHTML = `<h2 class="fr-title">Finish setting up</h2><ul class="fr-list">` + items.map(i =>
+      `<li class="${i.ok ? "ok" : "bad"}"><span class="fr-state">${i.ok ? "✓ Ready" : "✗ Needs attention"}</span> <strong>${T2A.esc(i.label)}</strong> — ${T2A.esc(i.detail)}${i.ok ? "" : `<div class="fr-action">What to do: ${T2A.esc(i.action)}</div>`}</li>`).join("") + `</ul>`;
+  },
   async api(path, opts) {
     const r = await fetch(path, opts);
-    if (!r.ok) throw new Error((await r.text()) || r.status);
+    if (!r.ok) throw new Error(T2A.friendly(await r.text(), r.status));
     return r.headers.get("content-type")?.includes("application/json") ? r.json() : r;
   },
   // Assertive announcement for errors (region lives in index.html).
@@ -58,6 +87,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   };
   try {
     const health = await T2A.api("/api/health");
+    T2A.renderChecklist(health.checklist);
     const missing = [!health.ffmpeg && "ffmpeg", !health.espeak && "espeak-ng",
       !health.libraryWritable && "writable library storage"].filter(Boolean);
     if (missing.length) {
