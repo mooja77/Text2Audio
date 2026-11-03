@@ -93,6 +93,8 @@ summary{cursor:pointer;color:var(--ac)}
 .toast.show{opacity:1}
 
 /* Accessibility: focus, skip link, alerts, target size, contrast */
+/* Links: the browser default #0000ee is 1.84:1 on --panel; --ac is ~6:1 (WCAG 1.4.3). */
+a{color:var(--ac)}a:visited{color:#d2a8ff}a:hover{text-decoration:underline}
 html{scroll-padding-top:72px}
 :focus-visible{outline:3px solid var(--ac);outline-offset:2px}
 main:focus{outline:none}

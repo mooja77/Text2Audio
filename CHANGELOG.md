@@ -6,6 +6,13 @@ All notable changes to Text2Audio are recorded here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- Links in the clone licence notice and the Help licence table used the browser
+  default colour (#0000ee, 1.84:1 on the dark panel). Links now use the theme
+  accent (about 6:1). Measured with axe-core across all five tabs: 27 contrast
+  violations → 0.
+
 ### Added
 
 - `GET /api/licenses` lists the components in use with licence, verdict and source link, read from the `## Summary` table in `docs/LICENSES.md`. The Help tab renders it as a table. F5-TTS weights show as CC-BY-NC-4.0, Kokoro as Apache-2.0.
