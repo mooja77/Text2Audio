@@ -33,6 +33,7 @@ from backend.pronunciations import PronunciationStore
 from backend.voices import VoiceStore
 from backend.quality import build_chapter_export, quality_report
 from backend.cache import ChunkCache
+from backend.licenses import load_components
 from pipeline.clone_synth import ClonedSynthesizer
 from pipeline.normalize import normalize_text, BUILTIN_PRONUNCIATIONS
 from pipeline.ingest import build_book_text
@@ -159,6 +160,11 @@ def health():
             "device": select_device(),
             "libraryPath": os.path.abspath(LIBRARY_DIR),
             "voicesWritable": os.access(VOICES_DIR, os.W_OK)}
+
+
+@app.get("/api/licenses")
+def licenses():
+    return {"components": load_components()}
 
 
 @app.get("/api/voices")
