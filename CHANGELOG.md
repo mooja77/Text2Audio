@@ -28,6 +28,10 @@ All notable changes to Text2Audio are recorded here. The format follows
   the GPLv3 ffmpeg build the installer uses, LGPL `num2words`/libsndfile, and a
   credits block.
 
+### Security
+
+- The server only ever binds `127.0.0.1`. `server.main()` calls `assert_loopback()` and refuses to start on any other host; a test fails if `main()` would bind a non-loopback host. `GET /api/health` now includes `bind` (e.g. `127.0.0.1:8765`).
+
 ### Changed (API)
 
 - **Unknown narrator voices now return HTTP 422 instead of HTTP 400** on
