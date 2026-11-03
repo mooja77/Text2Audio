@@ -6,6 +6,14 @@ All notable changes to Text2Audio are recorded here. The format follows
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-11-03
+
+Licence gating, a real offline guarantee, accessibility and plain-language help.
+Every model and library licence was verified against its upstream source.
+
+**Upgrade note (API):** an unknown narrator voice now returns HTTP 422 (was 400) on
+render, render-upload and voice-preview; see "Changed (API)" below.
+
 ### Fixed
 
 - Links in the clone licence notice and the Help licence table used the browser

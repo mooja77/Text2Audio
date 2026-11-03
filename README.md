@@ -86,8 +86,18 @@ speed — a CUDA build of PyTorch (`pip` pulls the CPU build by default). See
 - 🗣️ **Reads text correctly** — expands numbers/abbreviations and an editable
   **pronunciation dictionary** fixes tricky names.
 - 🎤 **Voice cloning** (optional) — upload ~10–30 s of speech and narrate in that
-  voice, via F5-TTS (runs isolated; Kokoro stays the fast default).
-- 🔒 **100% local & free** — your text and audio never leave your machine.
+  voice, via F5-TTS (runs isolated; Kokoro stays the fast default). **Non-commercial
+  only:** the F5-TTS weights are CC-BY-NC-4.0, so the app asks you to acknowledge
+  this once before you clone or narrate with a cloned voice, and marks those books.
+- 🔒 **100% local & free** — your text and audio never leave your machine. The
+  server binds `127.0.0.1` only, and once the model is downloaded a render opens
+  no network connections.
+- ♿ **Accessible** — keyboard-only use, visible focus, screen-reader
+  announcements for progress and errors; checked against WCAG 2.2 AA with axe-core.
+- 🧭 **Plain-language help** — a first-run checklist (audio tool, pronunciation
+  tool, voice model, disk space) and errors written for people, not programmers.
+- 📜 **Licences in the app** — Help lists every model and library with its
+  licence, from the verified record in [`docs/LICENSES.md`](docs/LICENSES.md).
 - ✏️ **Review before rendering** — edit prepared text and chapter markers in Studio.
 - 🖼️ **Cover artwork** — embed JPEG, PNG or WebP art in the finished M4B.
 - 📦 **Flexible export** — personal M4B, lossless chapter WAV ZIP, or ACX-review
@@ -220,7 +230,8 @@ process).
 .\.venv\Scripts\python.exe -m pip install "torchaudio==2.6.0" --index-url https://download.pytorch.org/whl/cu124
 ```
 
-Then in **Voices → Clone a voice**: name it, upload ~10–30 s of clean speech, and
+Then in **Voices → Clone a voice**: read the licence notice and tick it once
+(cloned voices are non-commercial, CC-BY-NC-4.0), name the voice, upload ~10–30 s of clean speech, and
 (optionally) paste a transcript of the clip for best quality. The cloned voice
 appears alongside the built-ins and in the Create dropdown. Cloned renders are
 higher quality but much slower — use **▶ Sample** to audition first.
@@ -261,7 +272,8 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). Issues and PRs welcome.
 
 Text2Audio's code is **MIT** (see [LICENSE](LICENSE)). The TTS **models** it
 downloads have their own licenses — notably the F5-TTS cloning weights are
-**CC-BY-NC (non-commercial)**. See [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).
+**CC-BY-NC (non-commercial)**. See [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md)
+and the verified record with sources in [docs/LICENSES.md](docs/LICENSES.md).
 
 ## Acknowledgements
 
