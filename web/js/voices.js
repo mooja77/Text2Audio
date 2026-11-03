@@ -13,13 +13,26 @@ const Voices = {
         <textarea class="cinput" id="cv-text" aria-label="Transcript of the clip (optional)" rows="2" placeholder="(optional) type what's said in the clip — improves quality; leave blank to auto-detect"></textarea>
         <button class="btn" id="cv-add" style="margin-top:8px">Create voice</button>
         <div class="muted" style="font-size:12px;margin-top:6px">Upload ~10–30s of clean speech. Cloned renders are higher quality but much slower.</div>
+        <div id="cv-notice" role="note" style="font-size:13px;margin-top:10px">
+          <p style="margin:0 0 6px">Cloned voices can't be used in audiobooks you sell.</p>
+          <p style="margin:0 0 6px">Cloning uses F5-TTS weights from <a href="https://github.com/SWivid/F5-TTS" target="_blank" rel="noreferrer">SWivid/F5-TTS</a>, licensed <a href="https://creativecommons.org/licenses/by-nc/4.0/" target="_blank" rel="noreferrer">CC-BY-NC-4.0</a> (non-commercial).</p>
+          <label id="cv-ack-wrap"><input type="checkbox" id="cv-ack"> I understand and will use cloned voices non-commercially only.</label>
+        </div>
       </div>
       <div class="cards" id="vcards"></div>`;
     el.querySelectorAll(".cinput").forEach(i => {
       i.style.cssText = "background:var(--panel2);border:1px solid var(--bd);color:var(--tx);border-radius:8px;padding:9px 10px;font-size:14px;width:100%;margin-top:8px";
     });
     document.getElementById("cv-add").onclick = () => this.clone();
+    this.loadConsent();
     this.refresh();
+  },
+
+  async loadConsent() {
+    try { this.acked = (await T2A.api("/api/clone-consent")).acknowledged === true; }
+    catch (e) { this.acked = false; }
+    const wrap = document.getElementById("cv-ack-wrap");
+    if (wrap) wrap.hidden = this.acked;
   },
 
   async refresh() {
@@ -56,6 +69,15 @@ const Voices = {
     if (!name || !file) { T2A.toast("Enter a name and choose an audio file"); return; }
     const fd = new FormData();
     fd.append("name", name); fd.append("audio", file); fd.append("refText", refText);
+    const box = document.getElementById("cv-ack");
+    if (!this.acked) {
+      if (!box || !box.checked) { T2A.toast("Confirm the voice-licence notice first"); return; }
+      try {
+        await T2A.api("/api/clone-consent", { method: "POST",
+          headers: { "Content-Type": "application/json" }, body: JSON.stringify({ acknowledged: true }) });
+        this.acked = true;
+      } catch (e) { T2A.alert("Could not save your acknowledgement"); return; }
+    }
     T2A.toast("Creating voice…");
     try {
       await T2A.api("/api/voices/clone", { method: "POST", body: fd });

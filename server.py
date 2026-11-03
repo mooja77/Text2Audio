@@ -31,6 +31,7 @@ from backend.render import render_audiobook, remaster, purge_wavs, retag_audio
 from backend.render import UnknownVoiceError, resolve_synthesizer, validate_voice
 from backend.pronunciations import PronunciationStore
 from backend.voices import VoiceStore
+from backend.consent import read_consent, write_consent, LICENSE, ATTRIBUTION
 from backend.quality import build_chapter_export, quality_report
 from backend.cache import ChunkCache
 from backend.firstrun import first_run_checklist
@@ -41,6 +42,17 @@ from pipeline.documents import document_to_sources
 from pipeline.parse import parse_chapters
 
 ROOT = Path(__file__).parent
+
+# The only security boundary is the loopback bind (no auth). Not configurable.
+BIND_HOST = "127.0.0.1"
+BIND_PORT = 8765
+
+
+def assert_loopback(host: str) -> None:
+    """Fail closed: refuse to start on anything but 127.0.0.1."""
+    if host != "127.0.0.1":
+        raise ValueError(f"refusing non-loopback bind: {host!r}")
+
 WEB_DIR = ROOT / "web"
 LIBRARY_DIR = os.environ.get("T2A_LIBRARY_DIR", str(ROOT / "library"))
 
@@ -53,6 +65,8 @@ cache = ChunkCache(os.environ.get("T2A_CACHE_DIR",
                    os.path.join(os.path.dirname(LIBRARY_DIR), "data", "chunk-cache")),
                    max_bytes=int(os.environ.get("T2A_CACHE_MAX_BYTES", str(5 * 1024**3))))
 jobs = JobManager()
+CONSENT_PATH = os.environ.get("T2A_CONSENT_PATH",
+                              os.path.join(os.path.dirname(LIBRARY_DIR), "data", "clone-consent.json"))
 _render_lock = threading.Lock()      # one GPU render at a time
 _maintenance_lock = threading.Lock()
 
@@ -155,7 +169,8 @@ def health():
     ffmpeg = shutil.which("ffmpeg")
     espeak = shutil.which("espeak-ng") or os.environ.get("PHONEMIZER_ESPEAK_PATH")
     items = first_run_checklist(bool(ffmpeg), bool(espeak), models_cached(), LIBRARY_DIR)
-    return {"status": "ok", "ffmpeg": bool(ffmpeg), "espeak": bool(espeak),
+    return {"status": "ok", "bind": f"{BIND_HOST}:{BIND_PORT}",
+            "ffmpeg": bool(ffmpeg), "espeak": bool(espeak),
             "checklist": items, "ready": all(i["ok"] for i in items),
             "libraryWritable": os.access(LIBRARY_DIR, os.W_OK),
             "voiceCloning": importlib.util.find_spec("f5_tts") is not None,
@@ -202,6 +217,9 @@ def _launch_render(req: RenderRequest, cover_data: bytes | None = None):
     except UnknownVoiceError as exc:
         # Checked before any library directory is created: no side effects.
         return _unknown_voice_response(exc.voice_id)
+    refusal = _clone_consent_refusal(req.voice)
+    if refusal is not None:  # before any library directory is created
+        return refusal
     # Serialize renders: concurrent GPU inference from two threads is unsafe.
     if not _render_lock.acquire(blocking=False):
         raise HTTPException(status_code=409, detail="A render is already in progress")
@@ -404,6 +422,9 @@ def voice_preview(req: PreviewRequest):
         validate_voice(req.voice, voices)
     except UnknownVoiceError as exc:
         return _unknown_voice_response(exc.voice_id)
+    refusal = _clone_consent_refusal(req.voice)
+    if refusal is not None:
+        return refusal
     if not _render_lock.acquire(blocking=False):
         raise HTTPException(status_code=409, detail="A render is already in progress")
     synth = None
@@ -479,9 +500,46 @@ def parse_text_preview(req: ParseTextRequest):
                          for i, chapter in enumerate(chapters)]}
 
 
+class ConsentRequest(BaseModel):
+    acknowledged: bool = False
+
+
+def _clone_consent_refusal(voice_id):
+    """403 for a stored-clone voice until the F5-TTS licence is acknowledged.
+
+    Covers clones that were never created through the gate (for example a
+    voices folder restored from a backup), not only POST /api/voices/clone."""
+    if voice_id in PRESET_VOICES or read_consent(CONSENT_PATH)["acknowledged"]:
+        return None
+    return JSONResponse(status_code=403, content={
+        "detail": "clone licence not acknowledged", "error": "consent_required",
+        "license": LICENSE, "attribution": ATTRIBUTION})
+
+
+@app.get("/api/clone-consent")
+def clone_consent_get():
+    return {**read_consent(CONSENT_PATH), "license": LICENSE, "attribution": ATTRIBUTION}
+
+
+@app.post("/api/clone-consent")
+def clone_consent_set(req: ConsentRequest):
+    if req.acknowledged is not True:
+        return JSONResponse(status_code=422, content={
+            "detail": "acknowledged must be true", "error": "bad_request"})
+    try:
+        return write_consent(CONSENT_PATH, True)
+    except OSError:
+        return JSONResponse(status_code=500, content={
+            "detail": "could not persist consent", "error": "server_error"})
+
+
 @app.post("/api/voices/clone")
 async def voices_clone(name: str = Form(...), audio: UploadFile = File(...),
                        refText: str = Form("")):
+    if not read_consent(CONSENT_PATH)["acknowledged"]:
+        return JSONResponse(status_code=403, content={
+            "detail": "clone licence not acknowledged", "error": "consent_required",
+            "license": LICENSE, "attribution": ATTRIBUTION})
     if not name.strip() or len(name.strip()) > 200:
         raise HTTPException(status_code=400, detail="name is required")
     if len(refText) > 10_000:
@@ -516,7 +574,8 @@ _mount_static()
 
 def main():
     import uvicorn
-    host, port = "127.0.0.1", 8765
+    host, port = BIND_HOST, BIND_PORT
+    assert_loopback(host)
     if os.environ.get("T2A_NO_BROWSER") != "1":
         threading.Timer(0.8, lambda: webbrowser.open(f"http://{host}:{port}")).start()
     uvicorn.run(app, host=host, port=port, log_level="info")

@@ -351,7 +351,40 @@ def _wav_bytes():
     return buf.getvalue()
 
 
+def _ack(client):
+    assert client.post("/api/clone-consent", json={"acknowledged": True}).status_code == 200
+
+
+def test_clone_refused_until_acknowledged(client):
+    import server
+    before = sorted(os.listdir(server.voices.base))
+    files = {"audio": ("ref.wav", _wav_bytes(), "audio/wav")}
+    r = client.post("/api/voices/clone", files=files, data={"name": "N"})
+    assert r.status_code == 403
+    body = r.json()
+    assert body["error"] == "consent_required"
+    assert body["license"] == "CC-BY-NC-4.0" and body["attribution"] == "SWivid/F5-TTS"
+    assert sorted(os.listdir(server.voices.base)) == before
+    assert client.get("/api/clone-consent").json()["acknowledged"] is False
+    _ack(client)
+    state = client.get("/api/clone-consent").json()
+    assert state["acknowledged"] is True and state["acknowledgedAt"]
+    files = {"audio": ("ref.wav", _wav_bytes(), "audio/wav")}
+    assert client.post("/api/voices/clone", files=files, data={"name": "N"}).status_code == 200
+
+
+def test_clone_consent_rejects_false_and_heals_corrupt_file(client):
+    import server
+    assert client.post("/api/clone-consent", json={"acknowledged": False}).status_code == 422
+    os.makedirs(os.path.dirname(server.CONSENT_PATH), exist_ok=True)
+    with open(server.CONSENT_PATH, "w", encoding="utf-8") as f:
+        f.write("{broken")
+    r = client.get("/api/clone-consent")
+    assert r.status_code == 200 and r.json()["acknowledged"] is False
+
+
 def test_clone_create_list_delete(client):
+    _ack(client)
     files = {"audio": ("ref.wav", _wav_bytes(), "audio/wav")}
     data = {"name": "Cloney", "refText": "hello there"}
     r = client.post("/api/voices/clone", files=files, data=data)
@@ -365,6 +398,7 @@ def test_clone_create_list_delete(client):
 
 
 def test_clone_rejects_empty_name(client):
+    _ack(client)
     files = {"audio": ("ref.wav", _wav_bytes(), "audio/wav")}
     assert client.post("/api/voices/clone", files=files, data={"name": "  "}).status_code == 400
 
@@ -372,6 +406,7 @@ def test_clone_rejects_empty_name(client):
 def test_render_with_cloned_voice(client, monkeypatch):
     import server
     monkeypatch.setattr(server, "SYNTH_FACTORY", _FakeSynth)
+    _ack(client)
     vid = client.post("/api/voices/clone", files={"audio": ("r.wav", _wav_bytes(), "audio/wav")},
                       data={"name": "C"}).json()["id"]
     r = client.post("/api/render", json={"bookText": "## A\n\nhi", "voice": vid, "title": "X"})
@@ -385,3 +420,45 @@ def test_render_unknown_voice_still_422(client):
 def test_server_has_callable_main():
     import server
     assert callable(server.main)
+
+
+def test_render_and_preview_with_clone_need_consent_even_if_clone_was_not_made_through_the_gate(client, monkeypatch):
+    """A clone restored from a backup must not bypass the CC-BY-NC notice."""
+    import os
+    import server
+    monkeypatch.setattr(server, "SYNTH_FACTORY", _FakeSynth)
+    _ack(client)
+    files = {"audio": ("ref.wav", _wav_bytes(), "audio/wav")}
+    vid = client.post("/api/voices/clone", files=files, data={"name": "Restored"}).json()["id"]
+    os.remove(server.CONSENT_PATH)  # e.g. voices folder copied to a new PC
+    before = sorted(os.listdir(server.library.base))
+    r = client.post("/api/render", json={"bookText": "## A\n\nhi", "voice": vid})
+    assert r.status_code == 403 and r.json()["error"] == "consent_required"
+    assert sorted(os.listdir(server.library.base)) == before
+    assert client.post("/api/voice-preview", json={"voice": vid}).status_code == 403
+    assert client.post("/api/render", json={"bookText": "## A\n\nhi", "voice": "af_heart"}).status_code == 200
+
+def test_health_reports_bind_address(client):
+    assert client.get("/api/health").json()["bind"] == "127.0.0.1:8765"
+
+
+def test_main_binds_only_loopback(monkeypatch):
+    import uvicorn, server
+    monkeypatch.setenv("T2A_NO_BROWSER", "1")
+    seen = []
+    monkeypatch.setattr(uvicorn, "run", lambda app, **kw: seen.append(kw))
+    server.main()
+    assert [kw["host"] for kw in seen] == ["127.0.0.1"]
+
+
+@pytest.mark.parametrize("host", ["0.0.0.0", "::", "::1", "localhost", "192.168.1.5", ""])
+def test_main_never_binds_non_loopback(monkeypatch, host):
+    import uvicorn, server
+    monkeypatch.setenv("T2A_NO_BROWSER", "1")
+    monkeypatch.setenv("T2A_HOST", host)  # must have no effect
+    monkeypatch.setattr(server, "BIND_HOST", host)
+    seen = []
+    monkeypatch.setattr(uvicorn, "run", lambda app, **kw: seen.append(kw))
+    with pytest.raises(ValueError):
+        server.main()
+    assert seen == []

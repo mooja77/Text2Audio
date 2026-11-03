@@ -28,6 +28,7 @@ Text2Audio remembers title, author, voice, speed and guide progress in local bro
 - **Publishing:** use the quality report and chapter export in Library. Distribution
   presets still require editorial listening and the distributor's own validation.
 - **"Unknown voice" when generating:** the chosen narrator is no longer available (for example a cloned voice was deleted). Pick another narrator and generate again; nothing was added to your library.
+- **Cloning asks me to confirm a licence notice:** cloned voices use F5-TTS weights licensed CC-BY-NC-4.0 (non-commercial), so audiobooks made with them can't be sold. Tick the box once; Text2Audio remembers it on this computer. Books made with a cloned voice are marked "non-commercial" in their details.
 - **Wrong pronunciation:** add a rule in the Pronounce tab, preview, and regenerate.
 - **First model download:** the first narration downloads model files; later runs use the local cache. Once the model is cached, restart Text2Audio and it runs in offline mode: rendering makes no network connections.
 
@@ -41,7 +42,7 @@ Studio can be used with the keyboard alone: Tab / Shift+Tab move between control
 
 ## Privacy and safe support
 
-The server binds to `127.0.0.1`. Manuscripts, generated audio, cloned voices, and manifests stay on this computer. Text2Audio has no account system, telemetry, lifecycle email, or hosted processing.
+The server binds to `127.0.0.1` only; there is no setting to change this, and `GET /api/health` reports the bind address (`"bind": "127.0.0.1:8765"`). Manuscripts, generated audio, cloned voices, and manifests stay on this computer. Text2Audio has no account system, telemetry, lifecycle email, or hosted processing.
 
 GitHub issues are public. Do not attach private manuscripts, cloned voices, copyrighted source text, or logs containing private text. Use the synthetic example or another tiny synthetic reproduction.
 
