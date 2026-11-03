@@ -417,9 +417,31 @@ def test_render_unknown_voice_still_422(client):
     assert client.post("/api/render", json={"bookText": "## A\n\nhi", "voice": "nope"}).status_code == 422
 
 
+def test_licenses_lists_in_use_components(client):
+    r = client.get("/api/licenses")
+    assert r.status_code == 200
+    comps = {c["name"]: c for c in r.json()["components"]}
+    f5 = next(c for n, c in comps.items() if n.startswith("F5-TTS weights"))
+    assert f5["license"] == "CC-BY-NC-4.0" and f5["commercial"] is False
+    kokoro = comps["Kokoro-82M weights and voices"]
+    assert kokoro["license"] == "Apache-2.0" and kokoro["commercial"] is True
+    assert not any("Piper" in n for n in comps)  # proposed, not in use
+    assert all(c["link"].startswith("https://") for c in comps.values())
+
+
 def test_server_has_callable_main():
     import server
     assert callable(server.main)
+
+
+def test_licence_record_ships_in_the_wheel():
+    """/api/licenses reads docs/LICENSES.md, so the wheel must include it (3.10-safe: no tomllib)."""
+    import re
+    from pathlib import Path
+    text = (Path(__file__).resolve().parent.parent / "pyproject.toml").read_text(encoding="utf-8")
+    wheel = text[text.index("[tool.hatch.build.targets.wheel]"):]
+    include = re.search(r"include\s*=\s*\[(.*?)\]", wheel, re.S).group(1)
+    assert '"docs/LICENSES.md"' in include
 
 
 def test_render_and_preview_with_clone_need_consent_even_if_clone_was_not_made_through_the_gate(client, monkeypatch):

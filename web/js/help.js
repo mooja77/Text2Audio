@@ -86,11 +86,25 @@ const Help = {
           <source src="/help/text2audio-walkthrough.mp4" type="video/mp4">
           <track default kind="captions" srclang="en" label="English" src="/help/text2audio-walkthrough.vtt">
         </video><p class="muted">Prefer text? The same five steps are in the beginner guide on Create.</p></div>
+      <div class="panel help-video"><div class="label">Licences</div>
+        <div id="help-licences" class="muted">Loading…</div></div>
       <div class="help-actions"><a class="btn" target="_blank" rel="noreferrer" href="https://github.com/mooja77/Text2Audio/issues/new?template=bug_report.yml">Ask for help</a>
         <a class="btn" target="_blank" rel="noreferrer" href="https://github.com/mooja77/Text2Audio/issues/new?template=feature_request.yml">Request a feature</a></div>`;
     const input = document.getElementById("help-q");
     input.oninput = () => this.filter(input.value);
     this.filter("");
+    this.licences();
+  },
+  async licences() {
+    const box = document.getElementById("help-licences");
+    try {
+      const { components } = await T2A.api("/api/licenses");
+      const row = c => `<tr><th scope="row">${T2A.esc(c.name)}</th><td>${T2A.esc(c.usedFor)}</td>
+        <td>${T2A.esc(c.license)}${c.commercial ? "" : " (non-commercial)"}</td>
+        <td>${c.link ? `<a target="_blank" rel="noreferrer" href="${T2A.esc(c.link)}">Source</a>` : ""}</td></tr>`;
+      box.innerHTML = `<table class="lic-table"><thead><tr><th scope="col">Component</th><th scope="col">Used for</th>
+        <th scope="col">Licence</th><th scope="col">Link</th></tr></thead><tbody>${components.map(row).join("")}</tbody></table>`;
+    } catch (e) { box.textContent = "Could not load the licence list."; }
   },
   filter(query) {
     const words = String(query).toLowerCase().trim().split(/\s+/).filter(Boolean);
