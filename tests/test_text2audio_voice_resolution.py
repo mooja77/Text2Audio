@@ -63,5 +63,13 @@ def test_text2audio_unknown_voice_422_has_no_side_effects(client):
     before = sorted(os.listdir(server.library.base))
     r = client.post("/api/render", json={"bookText": "## A\n\nhi", "voice": "does_not_exist"})
     assert r.status_code == 422
-    assert r.json() == {"error": "unknown voice", "voice": "does_not_exist"}
+    assert r.json() == {"detail": "unknown voice", "error": "unknown voice",
+                        "voice": "does_not_exist"}
     assert sorted(os.listdir(server.library.base)) == before
+
+
+def test_text2audio_unknown_voice_preview_matches_render_contract(client):
+    r = client.post("/api/voice-preview", json={"voice": "does_not_exist"})
+    assert r.status_code == 422
+    assert r.json() == {"detail": "unknown voice", "error": "unknown voice",
+                        "voice": "does_not_exist"}

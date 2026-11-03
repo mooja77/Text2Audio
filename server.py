@@ -104,6 +104,16 @@ def voices_payload() -> list[dict]:
     return out
 
 
+def _unknown_voice_response(voice_id):
+    """One response for every endpoint that is given an unknown narrator voice.
+
+    ``detail`` keeps the shape FastAPI errors use elsewhere in this API, so
+    callers that read ``detail`` keep working; ``error``/``voice`` are the
+    machine-readable fields."""
+    return JSONResponse(status_code=422, content={
+        "detail": "unknown voice", "error": "unknown voice", "voice": voice_id})
+
+
 def resolve_synth(voice_id, speed):
     return resolve_synthesizer(voice_id, speed, voices)
 
@@ -184,8 +194,7 @@ def _launch_render(req: RenderRequest, cover_data: bytes | None = None):
         validate_voice(req.voice, voices)
     except UnknownVoiceError as exc:
         # Checked before any library directory is created: no side effects.
-        return JSONResponse(status_code=422,
-                            content={"error": "unknown voice", "voice": exc.voice_id})
+        return _unknown_voice_response(exc.voice_id)
     # Serialize renders: concurrent GPU inference from two threads is unsafe.
     if not _render_lock.acquire(blocking=False):
         raise HTTPException(status_code=409, detail="A render is already in progress")
@@ -384,8 +393,10 @@ _PREVIEW_TEXT = "This is a sample of the selected narrator voice."
 
 @app.post("/api/voice-preview")
 def voice_preview(req: PreviewRequest):
-    if req.voice not in PRESET_VOICES and voices.get(req.voice) is None:
-        raise HTTPException(status_code=400, detail="unknown voice")
+    try:
+        validate_voice(req.voice, voices)
+    except UnknownVoiceError as exc:
+        return _unknown_voice_response(exc.voice_id)
     if not _render_lock.acquire(blocking=False):
         raise HTTPException(status_code=409, detail="A render is already in progress")
     synth = None

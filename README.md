@@ -164,8 +164,10 @@ credits and room tone, listen to every chapter, and validate it with the distrib
 
 If a render request names a voice that is neither a built-in preset nor a stored
 cloned voice (for example, the clone was deleted in another tab), the API
-answers **HTTP 422** with `{"error": "unknown voice", "voice": "<id>"}` and
-creates nothing in your library. Voice lookup now lives in one place
+answers **HTTP 422** with
+`{"detail": "unknown voice", "error": "unknown voice", "voice": "<id>"}` and
+creates nothing in your library. Voice preview (`/api/voice-preview`) gives the
+same answer. Before v1.4.0 both endpoints answered HTTP 400. Voice lookup now lives in one place
 (`backend/render.py::resolve_synthesizer`). No new models or libraries were
 added, and nothing here touches the network.
 
