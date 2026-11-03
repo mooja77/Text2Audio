@@ -7,16 +7,16 @@ const Pronounce = {
       <div class="panel" style="max-width:680px">
         <div class="label">Add a rule</div>
         <div style="display:flex;gap:8px">
-          <input class="pinput" id="pw" placeholder="word (e.g. Carrigaline)">
-          <input class="pinput" id="ps" placeholder="say as (e.g. Carrig a line)">
+          <input class="pinput" id="pw" aria-label="Word to fix" placeholder="word (e.g. Carrigaline)">
+          <input class="pinput" id="ps" aria-label="How it should be said" placeholder="say as (e.g. Carrig a line)">
           <button class="btn" id="padd">Add</button>
         </div>
         <div class="label" style="margin-top:16px">Test how text will be read</div>
         <div style="display:flex;gap:8px">
-          <input class="pinput" id="pt" placeholder="type a word or sentence">
+          <input class="pinput" id="pt" aria-label="Text to test" placeholder="type a word or sentence">
           <button class="btn" id="ptbtn">Preview</button>
         </div>
-        <div id="ptout" class="muted" style="margin-top:8px"></div>
+        <div id="ptout" role="status" class="muted" style="margin-top:8px"></div>
       </div>
       <div class="panel" style="max-width:680px;margin-top:16px">
         <div class="label">Your rules</div>

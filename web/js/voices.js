@@ -7,10 +7,10 @@ const Voices = {
       <div class="panel" style="max-width:680px;margin-bottom:18px">
         <div class="label">Clone a voice</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <input class="cinput" id="cv-name" placeholder="Voice name (e.g. My Narrator)">
-          <input class="cinput" id="cv-file" type="file" accept="audio/*">
+          <input class="cinput" id="cv-name" aria-label="Voice name" placeholder="Voice name (e.g. My Narrator)">
+          <input class="cinput" id="cv-file" aria-label="Reference audio file, about 10 to 30 seconds" type="file" accept="audio/*">
         </div>
-        <textarea class="cinput" id="cv-text" rows="2" placeholder="(optional) type what's said in the clip — improves quality; leave blank to auto-detect"></textarea>
+        <textarea class="cinput" id="cv-text" aria-label="Transcript of the clip (optional)" rows="2" placeholder="(optional) type what's said in the clip — improves quality; leave blank to auto-detect"></textarea>
         <button class="btn" id="cv-add" style="margin-top:8px">Create voice</button>
         <div class="muted" style="font-size:12px;margin-top:6px">Upload ~10–30s of clean speech. Cloned renders are higher quality but much slower.</div>
       </div>
@@ -31,8 +31,8 @@ const Voices = {
         <div class="vn">${T2A.esc(v.label)} ${v.kind === "cloned" ? '<span style="font-size:10px;color:var(--ac2)">● cloned</span>' : ""}</div>
         <div class="vm">${T2A.esc(v.accent)}${v.gender ? " · " + T2A.esc(v.gender) : ""}</div>
         <div class="row">
-          <button class="btn play" data-v="${T2A.esc(v.id)}">▶ Sample</button>
-          <button class="btn use" data-v="${T2A.esc(v.id)}">Use</button>
+          <button class="btn play" data-v="${T2A.esc(v.id)}" aria-label="Play sample of ${T2A.esc(v.label)}">▶ Sample</button>
+          <button class="btn use" data-v="${T2A.esc(v.id)}" aria-label="Use ${T2A.esc(v.label)} as narrator">Use</button>
           ${v.kind === "cloned" ? `<button class="btn del" data-v="${T2A.esc(v.id)}" aria-label="Delete ${T2A.esc(v.label)}">✕</button>` : ""}
         </div>
       </div>`).join("");
@@ -61,7 +61,7 @@ const Voices = {
       await T2A.api("/api/voices/clone", { method: "POST", body: fd });
       document.getElementById("cv-name").value = ""; document.getElementById("cv-text").value = "";
       T2A.toast("Voice created"); this.refresh();
-    } catch (e) { T2A.toast("Clone failed — check the audio file"); }
+    } catch (e) { T2A.alert("Clone failed — check the audio file"); }
   },
 
   async sample(voice, btn) {

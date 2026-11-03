@@ -31,6 +31,10 @@ Text2Audio remembers title, author, voice, speed and guide progress in local bro
 - **Wrong pronunciation:** add a rule in the Pronounce tab, preview, and regenerate.
 - **First model download:** the first narration downloads model files; later runs use the local cache. Once the model is cached, restart Text2Audio and it runs in offline mode: rendering makes no network connections.
 
+## Accessibility
+
+Studio can be used with the keyboard alone: Tab / Shift+Tab move between controls, Enter or Space activates them, and the arrow keys switch tabs. A **Skip to main content** link appears on the first Tab. The five-step beginner guide, file dropzone, library cards and chapter rows are all keyboard-operable, and the focused control always has a visible outline. Render progress is announced politely and errors are announced immediately to screen readers. Colours are chosen to meet WCAG 2.2 AA contrast.
+
 ## Privacy and safe support
 
 The server binds to `127.0.0.1`. Manuscripts, generated audio, cloned voices, and manifests stay on this computer. Text2Audio has no account system, telemetry, lifecycle email, or hosted processing.

@@ -8,6 +8,8 @@ All notable changes to Text2Audio are recorded here. The format follows
 
 ### Added
 
+- Studio accessibility pass (WCAG 2.2 AA): labels on every control, visible focus outlines, a skip link, `aria-live` announcements for render progress and an assertive alert region for errors, keyboard-operable dropzone, library cards and chapter rows, focus management in the beginner guide, and higher-contrast primary buttons. No change to the render flow.
+
 - `backend/offline.py`: when the models are cached, `HF_HUB_OFFLINE`,
   `TRANSFORMERS_OFFLINE` and `HF_HUB_DISABLE_TELEMETRY` are set at the top of
   `server.py` and `pipeline/f5_worker.py`, before any Hugging Face import. A
