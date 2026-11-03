@@ -29,7 +29,7 @@ Text2Audio remembers title, author, voice, speed and guide progress in local bro
   presets still require editorial listening and the distributor's own validation.
 - **"Unknown voice" when generating:** the chosen narrator is no longer available (for example a cloned voice was deleted). Pick another narrator and generate again; nothing was added to your library.
 - **Wrong pronunciation:** add a rule in the Pronounce tab, preview, and regenerate.
-- **First model download:** the first narration downloads model files; later runs use the local cache.
+- **First model download:** the first narration downloads model files; later runs use the local cache. Once the model is cached, restart Text2Audio and it runs in offline mode: rendering makes no network connections.
 
 ## Privacy and safe support
 

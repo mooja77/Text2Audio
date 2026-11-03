@@ -14,6 +14,11 @@ import os
 import sys
 import tempfile
 
+from backend.offline import configure_at_startup
+
+# Before f5_tts (and so huggingface_hub) is imported; only offline if F5 and its vocoder are cached.
+configure_at_startup(repos=("SWivid/F5-TTS", "charactr/vocos-mel-24khz"))
+
 
 def main() -> None:
     real_out = sys.stdout

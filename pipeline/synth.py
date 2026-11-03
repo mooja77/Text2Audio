@@ -102,7 +102,9 @@ class Synthesizer(BaseSynthesizer):
         if device is None:
             device = select_device()
         from kokoro import KPipeline
+        from backend.offline import ensure_voice_available
         self.pipeline = KPipeline(lang_code=lang_code, device=device)
+        ensure_voice_available(voice)  # first use of a narrator while offline mode is forced
         self.voice = voice
         self.speed = speed
 

@@ -1,4 +1,8 @@
 """Text2Audio Studio — FastAPI backend serving the web UI over the TTS pipeline."""
+from backend.offline import configure_at_startup
+
+OFFLINE_STATE = configure_at_startup()  # must run before huggingface_hub/transformers are imported
+
 import io
 import importlib.util
 import os
