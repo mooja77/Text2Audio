@@ -183,6 +183,14 @@ you set `HF_HUB_OFFLINE` yourself, Text2Audio leaves it alone. The cloning worke
 F5-TTS and Vocos files are cached. `tests/test_render.py` checks that a mocked
 render never opens a socket.
 
+### First-run checklist and error messages
+
+Studio shows a short setup checklist at the top of the page covering ffmpeg,
+espeak-ng, the voice-model download and free disk space (2 GB). Each item that
+needs attention says what to do. The same list is returned by `GET /api/health`
+as `checklist` (with `ready` true when every item passes). Errors in the UI are
+shown in plain language, never as raw stack traces.
+
 ### Chapter markers
 
 For one-file-per-chapter imports, each file's first `# Heading` becomes the

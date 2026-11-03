@@ -18,6 +18,16 @@ def test_health_ok(client):
     assert {"ffmpeg", "espeak", "libraryWritable", "voiceCloning"} <= r.json().keys()
 
 
+def test_health_first_run_checklist(client):
+    body = client.get("/api/health").json()
+    assert [i["id"] for i in body["checklist"]] == ["ffmpeg", "espeak", "models", "disk"]
+    for item in body["checklist"]:
+        assert item["label"] and item["detail"]
+        if not item["ok"]:
+            assert item["action"]
+    assert body["ready"] == all(i["ok"] for i in body["checklist"])
+
+
 def test_voices_listed(client):
     r = client.get("/api/voices")
     assert r.status_code == 200
