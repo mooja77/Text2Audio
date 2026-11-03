@@ -14,6 +14,12 @@ const T2A = {
     if (!r.ok) throw new Error((await r.text()) || r.status);
     return r.headers.get("content-type")?.includes("application/json") ? r.json() : r;
   },
+  // Assertive announcement for errors (region lives in index.html).
+  alert(msg) {
+    const a = document.getElementById("t2a-alert");
+    if (!a) return this.toast(msg);
+    a.textContent = ""; setTimeout(() => { a.textContent = msg; }, 50);
+  },
   toast(msg) {
     let t = document.querySelector(".toast");
     if (!t) { t = document.createElement("div"); t.className = "toast";
@@ -65,7 +71,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     if (saved.voice && T2A.state.voices.some(v => v.id === saved.voice)) T2A.state.voice = saved.voice;
     if (Number.isFinite(saved.speed)) T2A.state.speed = saved.speed;
     T2A.state.firstValue = (await T2A.api("/api/library")).length > 0;
-  } catch (e) { T2A.toast("Backend not reachable"); }
+  } catch (e) { T2A.alert("Backend not reachable"); }
   T2A.state.activeJob = localStorage.getItem("text2audio.activeJob");
   Create.render();
   Create.resumeActiveRender();

@@ -19,8 +19,8 @@ const Onboarding = {
     const [title, detail] = GUIDE_STEPS[i];
     return `<aside class="quickstart" aria-labelledby="guide-title">
       <div class="guide-top"><span id="guide-count">BEGINNER GUIDE · ${i + 1} OF 5</span><button id="guide-skip" type="button">Skip guide</button></div>
-      <h3 id="guide-title">${T2A.esc(title)}</h3><p id="guide-detail">${T2A.esc(detail)}</p>
-      <div class="guide-progress" role="progressbar" aria-valuemin="1" aria-valuemax="5" aria-valuenow="${i + 1}"><i style="width:${(i + 1) * 20}%"></i></div>
+      <h3 id="guide-title" tabindex="-1" aria-live="polite">${T2A.esc(title)}</h3><p id="guide-detail">${T2A.esc(detail)}</p>
+      <div class="guide-progress" role="progressbar" aria-label="Beginner guide progress" aria-valuemin="1" aria-valuemax="5" aria-valuenow="${i + 1}"><i style="width:${(i + 1) * 20}%"></i></div>
       <div class="guide-actions"><button class="btn" id="guide-back" ${i === 0 ? "disabled" : ""}>Back</button>
       <button class="btn" id="guide-next" ${i === 4 ? "disabled" : ""}>Next</button></div>
     </aside>`;
@@ -28,9 +28,11 @@ const Onboarding = {
   bind() {
     document.getElementById("guide-reopen")?.addEventListener("click", () => {
       localStorage.removeItem("text2audio.guideDismissed"); Create.render();
+      document.getElementById("guide-title")?.focus();
     });
     document.getElementById("guide-skip")?.addEventListener("click", () => {
       localStorage.setItem("text2audio.guideDismissed", "1"); Create.render();
+      document.getElementById("guide-reopen")?.focus();
     });
     document.getElementById("guide-back")?.addEventListener("click", () => this.setStep(this.step() - 1));
     document.getElementById("guide-next")?.addEventListener("click", () => this.setStep(this.step() + 1));
@@ -69,6 +71,7 @@ const HELP_ITEMS = [
   ["Generation is slow", "CPU rendering works but can be slow. Try the safe short example first or use an NVIDIA GPU.", "slow cpu gpu performance"],
   ["A word is pronounced incorrectly", "Open Pronounce, add how the word should sound, preview it, then regenerate.", "pronounce name word dictionary"],
   ["Privacy and files", "The Studio binds to this computer only. Manuscript text, audio, voices and manifests stay in the local Text2Audio folders. UI settings and an active job ID are stored in this browser; manuscript text is not. GitHub issues are public, so never attach a private manuscript, cloned voice, or logs containing private text.", "privacy local files storage telemetry upload"],
+  ["Using only the keyboard", "Press Tab to move between controls and Enter or Space to activate them. Use the arrow keys to switch tabs. The dropzone, library cards and chapter rows are all reachable with Tab. Progress and errors are announced to screen readers.", "keyboard tab accessibility screen reader magnifier focus"],
   ["Voice cloning boundary", "Clone only your own voice, a voice you have explicit permission to use, or a public-domain recording. Do not impersonate people or make deceptive audio.", "clone consent responsible voice"],
 ];
 

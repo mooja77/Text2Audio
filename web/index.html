@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="/css/studio.css">
 </head>
 <body>
+  <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar">
     <div class="brand">🎧 Text2Audio <span>Studio</span></div>
     <nav class="tabs" role="tablist" aria-label="Studio sections">
@@ -16,10 +17,11 @@
       <button class="tab" role="tab" aria-selected="false" aria-controls="tab-pronounce" data-tab="pronounce">Pronounce</button>
       <button class="tab" role="tab" aria-selected="false" aria-controls="tab-help" data-tab="help">Help</button>
     </nav>
-    <div id="ffmpeg-warn" class="warn" hidden>⚠ ffmpeg not found</div>
+    <div id="ffmpeg-warn" class="warn" role="alert" hidden>⚠ ffmpeg not found</div>
   </header>
+  <div id="t2a-alert" class="t2a-alert" role="alert" aria-live="assertive" aria-atomic="true"></div>
 
-  <main>
+  <main id="main" tabindex="-1">
     <section id="tab-create" role="tabpanel" class="tabpane active"></section>
     <section id="tab-voices" role="tabpanel" class="tabpane"></section>
     <section id="tab-library" role="tabpanel" class="tabpane"></section>

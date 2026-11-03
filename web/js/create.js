@@ -12,8 +12,8 @@ const Create = {
       <div class="grid2">
         <div class="panel">
           <div class="label">Source files</div>
-          <div class="dropzone" id="dz">Drop manuscript files here, or click to browse
-            <input type="file" id="fi" multiple accept=".md,.txt,.docx,.epub,.pdf" hidden></div>
+          <div class="dropzone" id="dz" role="button" tabindex="0" aria-label="Add manuscript files: press Enter to browse, or drop files here">Drop manuscript files here, or click to browse
+            <input type="file" id="fi" multiple accept=".md,.txt,.docx,.epub,.pdf" aria-label="Manuscript files" hidden></div>
           <button class="btn example" id="use-example" type="button">Use safe example</button>
           <div class="filelist" id="fl"></div>
         </div>
@@ -24,13 +24,13 @@ const Create = {
           <div class="field"><label for="f-cover">Cover artwork (optional)</label><input id="f-cover" type="file" accept="image/jpeg,image/png,image/webp"></div>
           <div class="field"><label for="f-voice">Narrator voice</label>
             <div class="voicepick"><select id="f-voice">${voiceOpts}</select>
-              <button class="btn" id="f-prev">▶ Preview</button></div></div>
+              <button class="btn" id="f-prev" type="button" aria-label="Preview narrator voice">▶ Preview</button></div></div>
           <div class="field"><label for="f-speed">Speed · <span id="spd">${T2A.state.speed}</span>×</label>
             <input type="range" id="f-speed" min="0.5" max="1.5" step="0.05" value="${T2A.state.speed}"></div>
           <button class="btn primary" id="gen" disabled>Generate Audiobook</button>
           <div class="progress" id="prog" ${T2A.state.activeJob ? "" : "hidden"}>
             <div class="bar" role="progressbar" aria-label="Audiobook render progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${T2A.state.renderProgress.percent}"><div class="barf" id="barf" style="width:${T2A.state.renderProgress.percent}%"></div></div>
-            <div class="meta" aria-live="polite"><span id="pmsg">${T2A.esc(T2A.state.renderProgress.message)}</span><span id="ppct">${T2A.state.renderProgress.percent}%</span></div>
+            <div class="meta" role="status" aria-live="polite"><span id="pmsg">${T2A.esc(T2A.state.renderProgress.message)}</span><span id="ppct">${T2A.state.renderProgress.percent}%</span></div>
             <button class="btn" id="cancel-render" type="button">Cancel render</button>
           </div>
         </div>
@@ -67,6 +67,7 @@ const Create = {
   bind() {
     const dz = document.getElementById("dz"), fi = document.getElementById("fi");
     dz.onclick = () => fi.click();
+    dz.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fi.click(); } };
     fi.onchange = () => this.addFiles([...fi.files]);
     dz.ondragover = e => { e.preventDefault(); dz.classList.add("drag"); };
     dz.ondragleave = () => dz.classList.remove("drag");
@@ -173,7 +174,7 @@ const Create = {
     } catch (e) {
       if (version === T2A.state.ingestVersion) {
         T2A.state.bookText = ""; T2A.state.chapters = []; T2A.state.ingestReady = false;
-        document.getElementById("gen").disabled = true; T2A.toast("Ingest failed: " + e.message);
+        document.getElementById("gen").disabled = true; T2A.alert("Ingest failed: " + e.message);
       }
       return false;
     }
@@ -216,7 +217,7 @@ const Create = {
       localStorage.setItem("text2audio.activeJob", jobId);
       T2A.state.activeJob = jobId;
       Onboarding.advanceTo(3);
-    } catch (e) { T2A.toast("Could not start render"); gen.disabled = false; return; }
+    } catch (e) { T2A.alert("Could not start render"); gen.disabled = false; return; }
 
     this.attachRender(jobId);
   },
@@ -260,7 +261,8 @@ const Create = {
         T2A.state.firstValue = true; Onboarding.complete();
         T2A.toast(resumed ? "Render recovered — audiobook ready" : "Audiobook ready"); T2A.showTab("library");
       } else if (e.type === "error") {
-        document.getElementById("pmsg").textContent = "Error: " + (e.message || "render failed");
+        const msg = "Error: " + (e.message || "render failed");
+        document.getElementById("pmsg").textContent = msg; T2A.alert(msg);
         src.close(); gen.disabled = false; localStorage.removeItem("text2audio.activeJob");
         T2A.state.activeJob = null; T2A.state.activeSource = null;
       }
@@ -268,6 +270,7 @@ const Create = {
     src.onerror = () => {
       if (src.readyState === EventSource.CLOSED) {
         gen.disabled = false; document.getElementById("pmsg").textContent = "Connection lost";
+        T2A.alert("Connection to the render was lost");
       } else {
         document.getElementById("pmsg").textContent = "Reconnecting to render…";
       }

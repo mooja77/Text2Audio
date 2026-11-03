@@ -11,9 +11,11 @@ const Player = {
     const aud = container.querySelector("#aud");
     const chaps = container.querySelector("#chaps");
     chaps.innerHTML = item.chapters.map((c, i) =>
-      `<div class="chap" data-s="${c.startMs / 1000}" data-i="${i}">
+      `<div class="chap" role="button" tabindex="0" data-s="${c.startMs / 1000}" data-i="${i}">
          <span class="muted">${i + 1}</span><span style="flex:1">${T2A.esc(c.title)}</span>
          <span class="muted">${fmt(c.startMs / 1000)}</span></div>`).join("");
+    chaps.querySelectorAll(".chap").forEach(row => row.onkeydown = e => {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); row.click(); } });
     chaps.querySelectorAll(".chap").forEach(row => row.onclick = () => {
       aud.currentTime = parseFloat(row.dataset.s); aud.play(); });
     aud.ontimeupdate = () => {

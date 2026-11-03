@@ -8,13 +8,16 @@ const Library = {
     catch (e) { wrap.innerHTML = `<p class="muted">Could not load library.</p>`; return; }
     if (!items.length) { wrap.innerHTML = `<p class="muted">No audiobooks yet — create one in the Create tab.</p>`; return; }
     wrap.innerHTML = `<div class="libgrid">${items.map(m => `
-      <div class="libcard" data-id="${m.id}">
-        <div class="cover">${m.coverFile ? `<img src="/api/cover/${m.id}">` : "🎧"}</div>
+      <div class="libcard" data-id="${m.id}" role="button" tabindex="0" aria-label="Open ${T2A.esc(m.title)}">
+        <div class="cover">${m.coverFile ? `<img src="/api/cover/${m.id}" alt="">` : "🎧"}</div>
         <div class="b"><div class="t">${T2A.esc(m.title)}</div>
           <div class="m">${T2A.esc(m.author || "—")}</div>
           <div class="m">${fmtDur(m.durationSeconds)} · ${m.chapters.length} ch</div></div>
       </div>`).join("")}</div>`;
-    wrap.querySelectorAll(".libcard").forEach(c => c.onclick = () => this.detail(c.dataset.id));
+    wrap.querySelectorAll(".libcard").forEach(c => {
+      c.onclick = () => this.detail(c.dataset.id);
+      c.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); c.click(); } };
+    });
     function fmtDur(s) { const h = Math.floor(s / 3600), m = Math.round((s % 3600) / 60); return h ? `${h}h ${m}m` : `${m}m`; }
   },
 
