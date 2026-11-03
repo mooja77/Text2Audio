@@ -321,3 +321,36 @@ def test_cancelled_render_removes_partial_work(tmp_path):
                          job_id="cancelled", emit=lambda e: None,
                          synth_factory=FakeSynth, cancelled=lambda: True)
     assert lib.get("cancelled") is None
+
+
+def test_clone_worker_gets_offline_env_and_opens_no_sockets(monkeypatch):
+    import json
+    import io
+    import pipeline.clone_synth as cs
+
+    monkeypatch.setenv("HF_HUB_OFFLINE", "1")
+    monkeypatch.setenv("TRANSFORMERS_OFFLINE", "1")
+    attempts = _block_network(monkeypatch)
+    seen = {}
+
+    class FakeProc:
+        stdin = io.StringIO()
+
+        def __init__(self):
+            self.stdout = io.StringIO(json.dumps({"ready": True}) + "\n")
+
+        def poll(self):
+            return None
+
+        def kill(self):
+            pass
+
+    def fake_popen(*args, **kwargs):
+        seen.update(kwargs)
+        return FakeProc()
+
+    monkeypatch.setattr(cs.subprocess, "Popen", fake_popen)
+    cs.ClonedSynthesizer("ref.wav", ref_text="hi", speed=1.0)
+    assert seen["env"]["HF_HUB_OFFLINE"] == "1"
+    assert seen["env"]["TRANSFORMERS_OFFLINE"] == "1"
+    assert attempts == []

@@ -41,6 +41,17 @@ from pipeline.documents import document_to_sources
 from pipeline.parse import parse_chapters
 
 ROOT = Path(__file__).parent
+
+# The only security boundary is the loopback bind (no auth). Not configurable.
+BIND_HOST = "127.0.0.1"
+BIND_PORT = 8765
+
+
+def assert_loopback(host: str) -> None:
+    """Fail closed: refuse to start on anything but 127.0.0.1."""
+    if host != "127.0.0.1":
+        raise ValueError(f"refusing non-loopback bind: {host!r}")
+
 WEB_DIR = ROOT / "web"
 LIBRARY_DIR = os.environ.get("T2A_LIBRARY_DIR", str(ROOT / "library"))
 
@@ -156,7 +167,8 @@ async def reject_cross_site_mutations(request: Request, call_next):
 def health():
     ffmpeg = shutil.which("ffmpeg")
     espeak = shutil.which("espeak-ng") or os.environ.get("PHONEMIZER_ESPEAK_PATH")
-    return {"status": "ok", "ffmpeg": bool(ffmpeg), "espeak": bool(espeak),
+    return {"status": "ok", "bind": f"{BIND_HOST}:{BIND_PORT}",
+            "ffmpeg": bool(ffmpeg), "espeak": bool(espeak),
             "libraryWritable": os.access(LIBRARY_DIR, os.W_OK),
             "voiceCloning": importlib.util.find_spec("f5_tts") is not None,
             "device": select_device(),
@@ -559,7 +571,8 @@ _mount_static()
 
 def main():
     import uvicorn
-    host, port = "127.0.0.1", 8765
+    host, port = BIND_HOST, BIND_PORT
+    assert_loopback(host)
     if os.environ.get("T2A_NO_BROWSER") != "1":
         threading.Timer(0.8, lambda: webbrowser.open(f"http://{host}:{port}")).start()
     uvicorn.run(app, host=host, port=port, log_level="info")

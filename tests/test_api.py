@@ -427,3 +427,28 @@ def test_render_and_preview_with_clone_need_consent_even_if_clone_was_not_made_t
     assert sorted(os.listdir(server.library.base)) == before
     assert client.post("/api/voice-preview", json={"voice": vid}).status_code == 403
     assert client.post("/api/render", json={"bookText": "## A\n\nhi", "voice": "af_heart"}).status_code == 200
+
+def test_health_reports_bind_address(client):
+    assert client.get("/api/health").json()["bind"] == "127.0.0.1:8765"
+
+
+def test_main_binds_only_loopback(monkeypatch):
+    import uvicorn, server
+    monkeypatch.setenv("T2A_NO_BROWSER", "1")
+    seen = []
+    monkeypatch.setattr(uvicorn, "run", lambda app, **kw: seen.append(kw))
+    server.main()
+    assert [kw["host"] for kw in seen] == ["127.0.0.1"]
+
+
+@pytest.mark.parametrize("host", ["0.0.0.0", "::", "::1", "localhost", "192.168.1.5", ""])
+def test_main_never_binds_non_loopback(monkeypatch, host):
+    import uvicorn, server
+    monkeypatch.setenv("T2A_NO_BROWSER", "1")
+    monkeypatch.setenv("T2A_HOST", host)  # must have no effect
+    monkeypatch.setattr(server, "BIND_HOST", host)
+    seen = []
+    monkeypatch.setattr(uvicorn, "run", lambda app, **kw: seen.append(kw))
+    with pytest.raises(ValueError):
+        server.main()
+    assert seen == []

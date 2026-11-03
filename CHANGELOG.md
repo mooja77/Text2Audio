@@ -16,7 +16,9 @@ All notable changes to Text2Audio are recorded here. The format follows
   GPU-free test fails if a mocked render opens any socket. Measured with the
   Kokoro model cached and the network blocked: 218 s → 23 s per render start,
   3 → 0 connection attempts. A narrator voice not used before is still
-  downloaded once on a connected PC, and a user's own `HF_HUB_OFFLINE` is left alone.
+  downloaded once on a connected PC, and a user's own `HF_HUB_OFFLINE` is left alone. The F5 cloning worker is now
+  spawned with the environment passed explicitly, and a test checks that it
+  receives the offline flags and opens no sockets.
 
 ### Documentation
 
@@ -41,6 +43,10 @@ All notable changes to Text2Audio are recorded here. The format follows
 - A book rendered with a cloned voice records `license: "non-commercial (F5-TTS
   CC-BY-NC-4.0)"` and `licenseAttribution: "SWivid/F5-TTS"` in its `manifest.json`,
   and the Library shows a "do not sell" note on that book.
+
+### Security
+
+- The server only ever binds `127.0.0.1`. `server.main()` calls `assert_loopback()` and refuses to start on any other host; a test fails if `main()` would bind a non-loopback host. `GET /api/health` now includes `bind` (e.g. `127.0.0.1:8765`).
 
 ### Changed (API)
 

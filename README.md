@@ -180,7 +180,8 @@ model is not cached yet, so the app stays online to download it; the offline
 setting applies from the next start. Choosing a narrator voice you have not used
 before still works on a connected PC: that one voice file is downloaded once. If
 you set `HF_HUB_OFFLINE` yourself, Text2Audio leaves it alone. The cloning worker does the same once the
-F5-TTS and Vocos files are cached. `tests/test_render.py` checks that a mocked
+F5-TTS and Vocos files are cached, and it is started with the offline
+settings passed explicitly. `tests/test_render.py` checks that a mocked
 render never opens a socket.
 
 ### Chapter markers
