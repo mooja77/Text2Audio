@@ -7,13 +7,17 @@ from backend import hardware
 
 
 def _smi(stdout, returncode=0):
+    # Existing fixtures model idle cards; real queries also return free memory.
+    stdout = "\n".join(line + ", " + line.rpartition(",")[2]
+                       if line.count(",") == 1 else line for line in stdout.splitlines())
     return lambda cmd, **kw: SimpleNamespace(returncode=returncode, stdout=stdout, stderr="")
 
 
 def _torch(available=True, name="Fake GPU", gib=8):
     props = SimpleNamespace(name=name, total_memory=int(gib * 1024**3))
     cuda = SimpleNamespace(is_available=lambda: available,
-                           get_device_properties=lambda i: props)
+                           get_device_properties=lambda i: props,
+                           mem_get_info=lambda i: (props.total_memory, props.total_memory))
     return SimpleNamespace(cuda=cuda)
 
 
@@ -108,3 +112,24 @@ def test_cli_prints_plain_message_and_exits_zero(tmp_path, monkeypatch, capsys):
     assert hardware.main(["--settings", str(path)]) == 0
     assert "6.0 GB" in capsys.readouterr().out
     assert json.loads(path.read_text(encoding="utf-8"))["gpu_usable"] is True
+
+def test_busy_gpu_uses_fast_voices_instead_of_promising_studio():
+    # Real query contract: name,total MiB,free MiB. Total VRAM is not free VRAM.
+    def probe(cmd, **kw):
+        text = "Busy Card, 24576, 2048\n" if "memory.free" in " ".join(cmd) else "Busy Card, 24576\n"
+        return SimpleNamespace(returncode=0, stdout=text, stderr="")
+    report = hardware.detect_with_nvidia_smi(probe)
+    assert report.usable is False
+    assert "free" in report.message.lower()
+
+
+def test_four_gb_card_cannot_fit_the_documented_studio_peak():
+    assert hardware.detect_with_nvidia_smi(_smi("Small, 4096\n")).usable is False
+
+
+def test_post_install_busy_gpu_and_invalid_memory_are_safe():
+    torch = _torch(gib=24)
+    torch.cuda.mem_get_info = lambda i: (2 * 1024**3, 24 * 1024**3)
+    assert hardware.detect_with_torch(torch).usable is False
+    for text in ("Card, 24576, nan", "Card, 24576, -1", "Card, 24576, 99999"):
+        assert hardware.detect_with_nvidia_smi(_smi(text)).usable is False
