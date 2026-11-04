@@ -153,3 +153,120 @@ def test_select_device_env_override(monkeypatch):
     monkeypatch.setenv("T2A_DEVICE", "invalid")
     with pytest.raises(ValueError):
         select_device()
+
+
+def _pinned_kokoro(tmp_path, monkeypatch, voice="af_heart"):
+    import hashlib
+    from backend import model_download as md
+    data = {"config.json": b'{"a": 1}', "kokoro-v1_0.pth": b"weights", f"voices/{voice}.pt": b"voice"}
+    specs = tuple(md.Spec(r, len(b), hashlib.sha256(b).hexdigest()) for r, b in data.items())
+    monkeypatch.setattr(md, "MANIFEST", {md.KOKORO_REPO: (md.KOKORO_REV, specs)})
+    monkeypatch.setenv("HF_HOME", str(tmp_path / "hf"))
+    monkeypatch.setenv("HF_HUB_CACHE", str(tmp_path / "hub"))
+    for rel, b in data.items():
+        p = md.local_path(str(tmp_path / "hub"), md.KOKORO_REPO, rel)
+        os.makedirs(os.path.dirname(p), exist_ok=True)
+        with open(p, "wb") as f:
+            f.write(b)
+    return md
+
+
+def _fake_kokoro(monkeypatch, language=True):
+    import sys
+    import types
+    from backend import model_download as md_
+    if language:
+        monkeypatch.setattr(md_, "language_ready", lambda: True)
+    calls = []
+
+    class KModel:
+        def __init__(self, **kw):
+            calls.append(("KModel", kw))
+
+        def to(self, device):
+            calls.append(("to", device))
+            return self
+
+        def eval(self):
+            return self
+
+    class KPipeline:
+        def __init__(self, **kw):
+            calls.append(("KPipeline", kw))
+
+    mod = types.ModuleType("kokoro")
+    mod.KModel, mod.KPipeline = KModel, KPipeline
+    monkeypatch.setitem(sys.modules, "kokoro", mod)
+    monkeypatch.setitem(sys.modules, "huggingface_hub", None)  # any Hub import fails
+    import backend.offline as off
+    monkeypatch.setattr(off, "ensure_voice_available",
+                        lambda *a, **k: (_ for _ in ()).throw(AssertionError("no Hub fetch")))
+    return calls
+
+
+def test_synthesizer_builds_real_kokoro_objects_from_local_pinned_files(tmp_path, monkeypatch):
+    from pipeline.synth import Synthesizer
+    md = _pinned_kokoro(tmp_path, monkeypatch)
+    calls = _fake_kokoro(monkeypatch)
+    s = Synthesizer(voice="af_heart", lang_code="a", device="cpu")
+    paths = md.kokoro_paths()
+    assert calls[0] == ("KModel", {"config": paths["config"], "model": paths["model"],
+                                   "repo_id": "hexgrad/Kokoro-82M"})
+    assert calls[1] == ("to", "cpu")
+    name, kw = calls[2]
+    assert name == "KPipeline" and kw["lang_code"] == "a" and kw["device"] == "cpu"
+    assert kw["model"] is not None and set(kw) == {"lang_code", "model", "device"}
+    assert s.voice == paths["voice"]("af_heart")
+
+
+def test_synthesizer_rejects_same_size_corrupt_weights_before_construction(tmp_path, monkeypatch):
+    from pipeline.synth import Synthesizer
+    md = _pinned_kokoro(tmp_path, monkeypatch)
+    calls = _fake_kokoro(monkeypatch)
+    with open(md.kokoro_paths()["model"], "wb") as f:
+        f.write(b"weighTs")  # same size as b"weights"
+    with pytest.raises(md.ModelUnavailable, match="kokoro-v1_0.pth"):
+        Synthesizer(voice="af_heart", lang_code="a", device="cpu")
+    assert calls == []
+
+
+def test_synthesizer_requires_the_selected_local_voice(tmp_path, monkeypatch):
+    from pipeline.synth import Synthesizer
+    md = _pinned_kokoro(tmp_path, monkeypatch)
+    calls = _fake_kokoro(monkeypatch)
+    os.remove(md.kokoro_paths()["voice"]("af_heart"))
+    with pytest.raises(md.ModelUnavailable, match="voices/af_heart.pt"):
+        Synthesizer(voice="af_heart", lang_code="a", device="cpu")
+    with pytest.raises(md.ModelUnavailable, match="model_download"):
+        Synthesizer(voice="am_adam", lang_code="a", device="cpu")
+    assert calls == []
+
+
+@pytest.mark.parametrize("installed", [None, "3.7.1"])
+def test_missing_or_wrong_language_blocks_kokoro_import_and_construction(tmp_path, monkeypatch, installed):
+    import importlib.metadata
+    import socket
+    import sys
+    from pipeline.synth import Synthesizer
+    md = _pinned_kokoro(tmp_path, monkeypatch)  # valid pinned local files
+    calls = _fake_kokoro(monkeypatch, language=False)
+    monkeypatch.setitem(sys.modules, "kokoro", None)  # any import of kokoro would fail
+    attempts = []
+
+    def deny(*a, **k):
+        attempts.append(a)
+        raise AssertionError("network access attempted")
+    monkeypatch.setattr(socket, "socket", deny)
+    monkeypatch.setattr(socket, "create_connection", deny)
+    monkeypatch.setattr(socket, "getaddrinfo", deny)
+
+    def version(name):
+        if installed is None:
+            raise importlib.metadata.PackageNotFoundError(name)
+        return installed
+    monkeypatch.setattr(importlib.metadata, "version", version)
+    with pytest.raises(md.ModelUnavailable, match="Install Text2Audio.bat") as exc:
+        Synthesizer(voice="af_heart", lang_code="a", device="cpu")
+    assert "en_core_web_sm" in str(exc.value)
+    assert "model_download" not in str(exc.value)
+    assert calls == [] and attempts == []

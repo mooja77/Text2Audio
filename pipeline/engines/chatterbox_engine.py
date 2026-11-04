@@ -4,17 +4,12 @@ Code: chatterbox-tts (MIT). Weights: ResembleAI/chatterbox, MIT, pinned to
 CHATTERBOX_REVISION. Every waveform Chatterbox returns carries Resemble AI's
 imperceptible Perth watermark (resemble-perth, MIT), which marks it as AI-generated.
 """
+import os
 from pathlib import Path
 
 import numpy as np
 
-from pipeline.engines import (CHATTERBOX_FILES, CHATTERBOX_REPO, CHATTERBOX_REVISION,
-                              STUDIO_VOICES)
-
-
-def _hf_hub_download():
-    from huggingface_hub import hf_hub_download
-    return hf_hub_download
+from pipeline.engines import CHATTERBOX_FILES, CHATTERBOX_REPO, STUDIO_VOICES
 
 
 def _chatterbox_tts():
@@ -56,8 +51,10 @@ class ChatterboxEngine:
 
 
 def load(device: str) -> ChatterboxEngine:
-    download = _hf_hub_download()
-    path = None
-    for name in CHATTERBOX_FILES:
-        path = download(repo_id=CHATTERBOX_REPO, filename=name, revision=CHATTERBOX_REVISION)
-    return ChatterboxEngine(_chatterbox_tts().from_local(Path(path).parent, device))
+    """Verify the pinned files (exact size + streamed digest), then load from that directory.
+
+    No Hub lookup ever happens here; missing or damaged files raise
+    md.ModelUnavailable with install/repair guidance before the model is built."""
+    from backend import model_download as md
+    pinned = md.require_files(CHATTERBOX_REPO, list(CHATTERBOX_FILES))
+    return ChatterboxEngine(_chatterbox_tts().from_local(Path(pinned), device))

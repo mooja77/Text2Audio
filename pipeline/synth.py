@@ -101,10 +101,24 @@ class Synthesizer(BaseSynthesizer):
                  device: str | None = None, speed: float = 1.0):
         if device is None:
             device = select_device()
-        from kokoro import KPipeline
-        from backend.offline import ensure_voice_available
-        self.pipeline = KPipeline(lang_code=lang_code, device=device)
-        ensure_voice_available(voice)  # first use of a narrator while offline mode is forced
+        from backend import model_download as md
+        # Exact size + streamed digest of config, weights and the selected voice BEFORE
+        # any model construction; raises md.ModelUnavailable with install/repair guidance.
+        md.require_files(md.KOKORO_REPO, ["config.json", "kokoro-v1_0.pth", f"voices/{voice}.pt"])
+        # Misaki would otherwise try an automatic GitHub/spaCy download of en_core_web_sm.
+        # Guard exact language readiness BEFORE importing or constructing anything.
+        if not md.language_ready():
+            raise md.ModelUnavailable(
+                "The English language model (en_core_web_sm %s) is missing or the wrong "
+                "version. Run Install Text2Audio.bat to install it, then try again. "
+                "Text2Audio does not download or install packages while rendering."
+                % md.LANGUAGE_VERSION)
+        from kokoro import KModel, KPipeline
+        paths = md.kokoro_paths()
+        kmodel = KModel(config=paths["config"], model=paths["model"],
+                        repo_id=paths["repo_id"]).to(device).eval()
+        self.pipeline = KPipeline(lang_code=lang_code, model=kmodel, device=device)
+        voice = paths["voice"](voice)
         self.voice = voice
         self.speed = speed
 
