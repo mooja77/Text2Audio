@@ -1,3 +1,5 @@
+import pytest
+
 from pipeline.normalize import (
     expand_numbers, expand_abbreviations, apply_pronunciations, normalize_text,
     BUILTIN_PRONUNCIATIONS,
@@ -18,6 +20,49 @@ def test_expand_ordinal():
 
 def test_numbers_skip_currency_time_decimal():
     assert expand_numbers("$5 at 3:30 costs 3.5") == "$5 at 3:30 costs 3.5"
+
+
+@pytest.mark.parametrize("text, expected", [
+    ("£1,250.75", "one thousand, two hundred and fifty pounds sterling and seventy-five pence"),
+    ("$3,000", "three thousand dollars and zero cents"),
+    ("€12.50", "twelve euro and fifty cents"),
+    ("£1.01", "one pound sterling and one penny"),
+    ("$1.01", "one dollar and one cent"),
+    ("€1.01", "one euro and one cent"),
+    ("£1999", "one thousand, nine hundred and ninety-nine pounds sterling and zero pence"),
+    ("£0.75", "zero pounds sterling and seventy-five pence"),
+    ("$3,000.50", "three thousand dollars and fifty cents"),
+    ("Pay £1,250.75.", "Pay one thousand, two hundred and fifty pounds sterling and seventy-five pence."),
+])
+def test_normalize_currency_amounts(text, expected):
+    assert normalize_text(text) == expected
+
+
+@pytest.mark.parametrize("text, expected", [
+    ("1,000,000", "one million"),
+    ("1,250", "one thousand, two hundred and fifty"),
+    ("3,000", "three thousand"),
+    ("1,999", "one thousand, nine hundred and ninety-nine"),
+    ("There were 12,345 people.", "There were twelve thousand, three hundred and forty-five people."),
+    ("1, 2, 3", "one, two, three"),
+])
+def test_normalize_comma_separated_numbers(text, expected):
+    assert normalize_text(text) == expected
+
+
+@pytest.mark.parametrize("text, expected", [
+    ("1999", "nineteen ninety-nine"),
+    ("1801", "eighteen oh-one"),
+    ("the 3rd", "the third"),
+    # Preserve the established convention: TTS handles times, decimals and %.
+    ("3:30", "3:30"),
+    ("12:05", "12:05"),
+    ("50%", "50%"),
+    ("12.5%", "12.5%"),
+    ("3.5", "3.5"),
+])
+def test_normalize_preserves_special_number_conventions(text, expected):
+    assert normalize_text(text) == expected
 
 
 def test_abbreviations_basic():
