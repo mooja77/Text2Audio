@@ -1,4 +1,5 @@
 import os
+import pytest
 import numpy as np
 from backend.library import Library
 from backend.render import render_audiobook, remaster, purge_wavs
@@ -293,22 +294,18 @@ def test_uncached_models_stay_online(tmp_path):
     assert "HF_HUB_OFFLINE" not in env and "TRANSFORMERS_OFFLINE" not in env
 
 
-def test_cloned_voice_render_records_noncommercial_license(tmp_path):
+@pytest.mark.parametrize("voice,engine", [("v0a1b2c3d4", "chatterbox"),
+                                          ("studio_narrator", "chatterbox"),
+                                          ("af_heart", "kokoro")])
+def test_render_records_engine_and_no_noncommercial_license(tmp_path, voice, engine):
+    """1.5 clones with Chatterbox (MIT): no book is marked non-commercial any more."""
     lib = Library(str(tmp_path))
-    m = render_audiobook(book_text="## A\n\nHi.", voice="v0a1b2c3d4", speed=1.0, title="T",
+    m = render_audiobook(book_text="## A\n\nHi.", voice=voice, speed=1.0, title="T",
                          author="", cover_path=None, library=lib, job_id="lic1",
                          emit=lambda e: None, synth_factory=FakeSynth)
-    assert m["license"] == "non-commercial (F5-TTS CC-BY-NC-4.0)"
-    assert m["licenseAttribution"] == "SWivid/F5-TTS"
-    assert lib.get("lic1")["license"] == m["license"]
-
-
-def test_preset_voice_render_has_no_license_field(tmp_path):
-    lib = Library(str(tmp_path))
-    m = render_audiobook(book_text="## A\n\nHi.", voice="af_heart", speed=1.0, title="T",
-                         author="", cover_path=None, library=lib, job_id="lic2",
-                         emit=lambda e: None, synth_factory=FakeSynth)
+    assert m["engine"] == engine
     assert "license" not in m and "licenseAttribution" not in m
+    assert lib.get("lic1")["engine"] == engine
 
 
 def test_cancelled_render_removes_partial_work(tmp_path):
@@ -354,3 +351,50 @@ def test_clone_worker_gets_offline_env_and_opens_no_sockets(monkeypatch):
     assert seen["env"]["HF_HUB_OFFLINE"] == "1"
     assert seen["env"]["TRANSFORMERS_OFFLINE"] == "1"
     assert attempts == []
+
+
+def test_chatterbox_weights_count_as_cached_only_when_complete(tmp_path):
+    from backend.offline import models_cached
+    from pipeline.engines import CHATTERBOX_FILES, CHATTERBOX_REPO, CHATTERBOX_REVISION
+    snap = (tmp_path / "hub" / "models--ResembleAI--chatterbox" / "snapshots" / CHATTERBOX_REVISION)
+    snap.mkdir(parents=True)
+    env = {"HF_HUB_CACHE": str(tmp_path / "hub")}
+    for name in CHATTERBOX_FILES[:-1]:
+        (snap / name).write_bytes(b"x")
+    assert models_cached(env, repos=(CHATTERBOX_REPO,)) is False  # interrupted download
+    (snap / CHATTERBOX_FILES[-1]).write_bytes(b"x")
+    assert models_cached(env, repos=(CHATTERBOX_REPO,)) is True
+
+
+def test_cache_never_reuses_pre_1_5_audio_for_a_cloned_voice(tmp_path):
+    """A 1.4 clone was narrated by F5 (CC-BY-NC). Its cached chunks must not be
+    reused once the same voice id is narrated by Chatterbox, or a re-render would
+    drop the non-commercial mark while still containing F5 audio."""
+    from backend.render import chunk_cache_key
+    from pipeline.synth import BaseSynthesizer
+    lib = Library(str(tmp_path))
+    text = "First sentence."
+    old_key = {"version": 1, "voice": "v0a1b2c3d4", "speed": 1.0, "text": text}  # 1.4 format
+    assert chunk_cache_key("v0a1b2c3d4", 1.0, text) != old_key
+    assert chunk_cache_key("v0a1b2c3d4", 1.0, text)["engine"] == "chatterbox"
+    # Kokoro keys are unchanged, so users keep their Kokoro cache.
+    assert chunk_cache_key("af_heart", 1.0, text) == {"version": 1, "voice": "af_heart",
+                                                      "speed": 1.0, "text": text}
+
+    calls = []
+
+    class Synth(BaseSynthesizer):
+        def __init__(self, voice, speed): pass
+        def synth_chunk(self, t):
+            calls.append(t)
+            return np.ones(1000, dtype=np.float32) * 0.01
+
+    class MemoryCache:
+        def __init__(self): self.values = {repr(old_key): np.zeros(1000, dtype=np.float32)}
+        def get(self, key): return self.values.get(repr(key))
+        def put(self, key, audio): self.values[repr(key)] = audio
+
+    render_audiobook(book_text="## A\n" + text, voice="v0a1b2c3d4", speed=1.0, title="T",
+                     author="", cover_path=None, library=lib, job_id="c1", emit=lambda e: None,
+                     synth_factory=Synth, chunk_cache=MemoryCache())
+    assert calls == [text]  # synthesized fresh, not served from the F5-era entry

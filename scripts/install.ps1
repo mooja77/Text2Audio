@@ -103,20 +103,24 @@ if (-not (Test-Path $vpy)) {
 & $vpy -m pip install --upgrade pip | Out-Null
 if ($LASTEXITCODE -ne 0) { Fail "Could not upgrade pip. Check your internet connection and try again." }
 
-# 3) PyTorch (CUDA if an NVIDIA GPU is present, else CPU)
+# 3) PyTorch (CUDA if an NVIDIA GPU is present, else CPU).
+# Pinned to 2.6.0: Chatterbox (the studio voice and cloning engine) requires exactly
+# torch/torchaudio 2.6.0. Installing it first from the CUDA index keeps the GPU build;
+# otherwise pip would later swap in the CPU-only 2.6.0 wheel from PyPI.
+$torchPins = @("torch==2.6.0", "torchaudio==2.6.0")
 $gpu = $false
 try { & nvidia-smi *> $null; if ($LASTEXITCODE -eq 0) { $gpu = $true } } catch {}
 if ($gpu) {
     Say "NVIDIA GPU detected - installing CUDA PyTorch"
-    & $vpy -m pip install torch --index-url https://download.pytorch.org/whl/cu124
+    & $vpy -m pip install @torchPins --index-url https://download.pytorch.org/whl/cu124
     if ($LASTEXITCODE -ne 0) {
         Write-Host "CUDA PyTorch was unavailable; falling back to the CPU build." -ForegroundColor Yellow
-        & $vpy -m pip install torch
+        & $vpy -m pip install @torchPins
         if ($LASTEXITCODE -ne 0) { Fail "PyTorch installation failed. Check your internet connection and try again." }
     }
 } else {
-    Say "No NVIDIA GPU - installing CPU PyTorch (works, just slower)"
-    & $vpy -m pip install torch
+    Say "No NVIDIA GPU - installing CPU PyTorch (works; use the fast Kokoro voices)"
+    & $vpy -m pip install @torchPins
     if ($LASTEXITCODE -ne 0) { Fail "PyTorch installation failed. Check your internet connection and try again." }
 }
 
@@ -153,5 +157,5 @@ try {
 Write-Host "`n=====================================================" -ForegroundColor Green
 Write-Host "  Done! Double-click 'Text2Audio' on your Desktop"     -ForegroundColor Green
 Write-Host "  (or 'Start Text2Audio' in this folder) to run it."   -ForegroundColor Green
-Write-Host "  Tip: voice cloning is optional - see INSTALL.md."    -ForegroundColor Green
+Write-Host "  The studio voice and cloning download ~3 GB on first use." -ForegroundColor Green
 Write-Host "=====================================================" -ForegroundColor Green

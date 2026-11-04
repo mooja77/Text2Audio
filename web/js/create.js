@@ -2,9 +2,12 @@ const Create = {
   render() {
     const el = document.getElementById("tab-create");
     const opt = v => `<option value="${T2A.esc(v.id)}" ${v.id === T2A.state.voice ? "selected" : ""}>${T2A.esc(v.label)}${v.kind === "cloned" ? " (cloned)" : ` · ${T2A.esc(v.accent)} ${T2A.esc(v.gender)}`}</option>`;
-    const presets = T2A.state.voices.filter(v => v.kind !== "cloned").map(opt).join("");
-    const cloned = T2A.state.voices.filter(v => v.kind === "cloned").map(opt).join("");
-    const voiceOpts = presets + (cloned ? `<optgroup label="Your voices">${cloned}</optgroup>` : "");
+    const group = (label, kind) => {
+      const o = T2A.state.voices.filter(v => v.kind === kind).map(opt).join("");
+      return o ? `<optgroup label="${label}">${o}</optgroup>` : "";
+    };
+    const voiceOpts = group("Studio voice (best quality, needs a graphics card)", "studio")
+      + group("Fast voices (Kokoro, any PC)", "preset") + group("Your voices", "cloned");
     el.innerHTML = `
       <h2>Create audiobook</h2>
       <p class="subtitle">Drop in manuscripts (.txt, Markdown, DOCX, EPUB or PDF), set options, and generate.</p>

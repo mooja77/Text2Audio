@@ -35,7 +35,7 @@ const Library = {
           '<button class="btn" id="purge">Purge source audio</button>' : ''}
         <button class="btn" id="quality">Audio quality report</button>
         <button class="btn" id="del">Delete</button></div>
-      ${item.license ? `<div class="warn" role="note" style="margin-top:12px">Made with a cloned voice: ${T2A.esc(item.license)}. Do not sell or publish this audiobook commercially.</div>` : ''}
+      ${item.license ? `<div class="warn" role="note" style="margin-top:12px">Made before Text2Audio 1.5 with a cloned voice: ${T2A.esc(item.license)}. Do not sell or publish this audiobook commercially. Re-render it to use the 1.5 cloning engine, which allows commercial use.</div>` : ''}
       <div id="quality-report" class="panel" style="margin-top:12px" hidden></div>
       ${item.wavKept ? '<div class="muted" style="margin-top:8px;font-size:12px">Source audio kept — you can re-master instantly. Purge to reclaim disk space.</div>' : ''}`;
     document.getElementById("back").onclick = () => this.render();

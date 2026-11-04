@@ -1,6 +1,6 @@
 # Licences used by Text2Audio
 
-**Verified live on 2026-11-03.** Every licence below was read from the upstream LICENSE file, model card or PyPI metadata at the pinned commit or revision shown. Text2Audio itself is MIT. It does not bundle any model weights: the user's own install downloads them from Hugging Face at runtime.
+**Verified live on 2026-11-03 and 2026-11-04.** Every licence below was read from the upstream LICENSE file, model card or PyPI metadata at the pinned commit or revision shown. Text2Audio itself is MIT. It does not bundle any model weights: the user's own install downloads them from Hugging Face at runtime.
 
 This is a factual summary, not legal advice.
 
@@ -11,17 +11,19 @@ Verdicts are for Text2Audio's use: a free MIT app, models downloaded at runtime,
 - **BLOCKED**: not acceptable as currently shipped. The fix is stated.
 - **UNRESOLVED**: no authoritative text was found.
 
+Since 1.5.0 every model Text2Audio runs has open-source code and weights (MIT or Apache-2.0) that allow commercial use. Nothing in use is non-commercial.
+
 ## Summary
 
 | Component | Used for | Licence | Verdict | Pinned source |
 |---|---|---|---|---|
-| F5-TTS code (`f5-tts` 1.1.22) | Voice cloning engine (optional `clone` extra) | MIT | ALLOWED | [LICENSE @45868ab](https://github.com/SWivid/F5-TTS/blob/45868abaabd74aabf03cd673d6dd00cc9d9c01ae/LICENSE) |
-| F5-TTS weights `F5TTS_v1_Base` | Voice cloning (default checkpoint) | CC-BY-NC-4.0 | **BLOCKED** as shipped. Becomes ALLOWED-WITH-CONDITIONS once gated (see below) | [card @84e5a41](https://huggingface.co/SWivid/F5-TTS/blob/84e5a410d9cead4de2f847e7c9369a6440bdfaca/README.md) |
-| Emilia dataset (F5 training data) | Not used directly | Emilia CC-BY-NC-4.0; Emilia-YODAS CC-BY-4.0 | n/a (it is the reason the F5 weights are NC) | [HF dataset @d7f2f73](https://huggingface.co/datasets/amphion/Emilia-Dataset/tree/d7f2f7340a6385696f3766c8049fa920a4707c07) (gated) |
-| Vocos weights `charactr/vocos-mel-24khz` | F5-TTS vocoder | MIT | ALLOWED | [card @0feb3fd](https://huggingface.co/charactr/vocos-mel-24khz/blob/0feb3fdd929bcd6649e0e7c5a688cf7dd012ef21/README.md) |
-| Vocos code (`vocos` 0.1.0) | F5-TTS vocoder | MIT | ALLOWED | [LICENSE @eb39abf](https://github.com/gemelo-ai/vocos/blob/eb39abfc42c1dee4854d9b10d44dd7d4fd3b0e53/LICENSE) |
-| Kokoro-82M weights and voices | Default narration | Apache-2.0 | ALLOWED | [card @f3ff357](https://huggingface.co/hexgrad/Kokoro-82M/blob/f3ff3571791e39611d31c381e3a41a3af07b4987/README.md) |
-| `kokoro` 0.9.4 (code) | Default narration | Apache-2.0 | ALLOWED | [LICENSE @dfb907a](https://github.com/hexgrad/kokoro/blob/dfb907a02bba8152ca444717ca5d78747ccb4bec/LICENSE) |
+| Chatterbox weights `ResembleAI/chatterbox` (English: `t3_cfg`, `s3gen`, `ve`, `tokenizer`, `conds`) | Studio narrator voice and voice cloning (default) | MIT | ALLOWED | [card @5bb1f6e](https://huggingface.co/ResembleAI/chatterbox/blob/5bb1f6ee58e50c3b8d408bc82a6d3740c2db6e18/README.md) |
+| Chatterbox code (`chatterbox-tts` 0.1.7) | Studio narrator voice and voice cloning (default) | MIT | ALLOWED | [LICENSE @5de7a54](https://github.com/resemble-ai/chatterbox/blob/5de7a54aa4e5e2baadb0182dde554908b48b85c2/LICENSE) |
+| `resemble-perth` 1.0.1 (Perth watermarker) | Marks Chatterbox audio as AI-generated (inaudible) | MIT | ALLOWED | [LICENSE @ff1c8ac](https://github.com/resemble-ai/perth/blob/ff1c8ac55a97/LICENSE) |
+| `s3tokenizer` 0.3.0 | Chatterbox speech tokenizer | Apache-2.0 | ALLOWED | [LICENSE @9bf5d84](https://github.com/xingchensong/S3Tokenizer/blob/9bf5d84/LICENSE) |
+| `pykakasi` 2.3.0 (pulled in by `chatterbox-tts`) | Japanese text for Chatterbox's multilingual model (not used by Text2Audio's English path) | GPL-3.0-or-later | ALLOWED-WITH-CONDITIONS | [PyPI](https://pypi.org/project/pykakasi/2.3.0/) |
+| Kokoro-82M weights and voices | Fast narrator voices (any PC) | Apache-2.0 | ALLOWED | [card @f3ff357](https://huggingface.co/hexgrad/Kokoro-82M/blob/f3ff3571791e39611d31c381e3a41a3af07b4987/README.md) |
+| `kokoro` 0.9.4 (code) | Fast narrator voices | Apache-2.0 | ALLOWED | [LICENSE @dfb907a](https://github.com/hexgrad/kokoro/blob/dfb907a02bba8152ca444717ca5d78747ccb4bec/LICENSE) |
 | `misaki` 0.9.4 (G2P) | Kokoro text-to-phoneme | Apache-2.0 | ALLOWED | [LICENSE @fba1236](https://github.com/hexgrad/misaki/blob/fba1236595f2d2bf21d414ba6e57d25256afada3/LICENSE) |
 | `phonemizer-fork` 3.3.2 (pulled in by `misaki[en]`) | espeak-ng wrapper | GPL-3.0-or-later | ALLOWED-WITH-CONDITIONS | [PyPI](https://pypi.org/project/phonemizer-fork/3.3.2/) |
 | espeak-ng | Kokoro phonemizer backend | GPL-3.0-or-later | ALLOWED-WITH-CONDITIONS | [COPYING @a6ad07d](https://github.com/espeak-ng/espeak-ng/blob/a6ad07d4d7b58194ae671809bf194bc0ce967af9/COPYING) |
@@ -34,49 +36,71 @@ Verdicts are for Text2Audio's use: a free MIT app, models downloaded at runtime,
 | fastapi 0.162.0 | Web server | MIT | ALLOWED | PyPI JSON |
 | uvicorn 0.54.0 | Web server | BSD-3-Clause | ALLOWED | PyPI JSON |
 | soundfile 0.14.0 (+ bundled libsndfile) | Audio I/O | BSD-3-Clause; libsndfile LGPL | ALLOWED-WITH-CONDITIONS | [LICENSE @e829339](https://github.com/bastibe/python-soundfile/blob/e8293394e6b712240f06aea5d074956481abf33e/LICENSE) |
-| numpy 2.5.4 | Arrays | BSD-3-Clause AND 0BSD AND MIT AND Zlib AND CC0-1.0 | ALLOWED | PyPI JSON |
+| numpy 1.26.4 (Chatterbox needs numpy < 2) | Arrays | BSD-3-Clause | ALLOWED | PyPI JSON |
 | python-multipart 0.0.33 | Uploads | Apache-2.0 | ALLOWED | PyPI JSON |
 | aiofiles 25.1.0 | File I/O | Apache-2.0 | ALLOWED | PyPI JSON |
 | num2words 0.5.14 | Number normalising | LGPL | ALLOWED-WITH-CONDITIONS | PyPI JSON |
 | pypdf 6.21.4 | PDF import | BSD-3-Clause | ALLOWED | PyPI JSON |
-| gradio 6.31.0 (optional `classic`) | Classic UI | Apache-2.0 | ALLOWED | PyPI JSON |
-| torch 2.15.0 | Inference | Apache-2.0 AND BSD and others (permissive) | ALLOWED | PyPI JSON |
-| torchaudio 2.11.1 | F5 audio | BSD (classifier) | ALLOWED | PyPI JSON |
+| gradio 6.8.0 (pinned by `chatterbox-tts`; also the optional `classic` UI) | Classic UI | Apache-2.0 | ALLOWED | PyPI JSON |
+| torch 2.6.0 / torchaudio 2.6.0 (pinned by `chatterbox-tts`) | Inference | BSD-3-Clause / BSD | ALLOWED | PyPI JSON |
+| transformers 5.2.0 (pinned by `chatterbox-tts`) | Chatterbox and Kokoro | Apache 2.0 | ALLOWED | PyPI JSON |
+| diffusers 0.29.0 / safetensors 0.5.3 / conformer 0.3.2 | Chatterbox | Apache-2.0 / Apache-2.0 / MIT | ALLOWED | PyPI JSON |
+| librosa 0.11.0 / pyloudnorm 0.2.0 / omegaconf 2.4.0 / spacy-pkuseg 1.0.2 | Chatterbox | ISC / MIT / BSD / MIT | ALLOWED | PyPI JSON |
 | spacy 3.8.18 / spacy-curated-transformers 2.1.2 | misaki[en] | MIT / MIT | ALLOWED | PyPI JSON |
-| transformers 5.22.1 | kokoro dep | Apache 2.0 | ALLOWED | PyPI JSON |
 
-PyPI versions are the latest on PyPI on 2026-11-03 (`https://pypi.org/pypi/<name>/json`). Raw PyPI output was captured with the release evidence.
+PyPI versions are the versions pinned by `requirements.txt` and `chatterbox-tts` 0.1.7, or the latest on PyPI on 2026-11-03 where nothing pins them (`https://pypi.org/pypi/<name>/<version>/json`).
 
 ---
 
-## 1. F5-TTS code
+## 1. Chatterbox (studio voice and voice cloning, default since 1.5.0)
 
-- Pinned: `SWivid/F5-TTS` commit `45868abaabd74aabf03cd673d6dd00cc9d9c01ae`. `pyproject.toml` there says `version = "1.1.22"`. The latest on PyPI is also `f5-tts` 1.1.22, with classifier `License :: OSI Approved :: MIT License`.
-- Quote (LICENSE): "MIT License / Copyright (c) 2024 Yushen CHEN / Permission is hereby granted, free of charge, to any person obtaining a copy of this software..."
-- Quote (README, License section): "Our code is released under MIT License. The pre-trained models are licensed under the CC-BY-NC license due to the training data Emilia, which is an in-the-wild dataset."
-- **Verdict: ALLOWED.** Keep the MIT notice.
+- **Weights**: HF `ResembleAI/chatterbox` sha `5bb1f6ee58e50c3b8d408bc82a6d3740c2db6e18`. Card front matter: `license: mit`. The repo has no separate LICENSE file; the card describes the models as "Resemble AI's production-grade open source TTS models". Text2Audio downloads only the English model's files at that pinned revision: `ve.safetensors`, `t3_cfg.safetensors`, `s3gen.safetensors`, `tokenizer.json` and `conds.pt` (about 3.2 GB). `conds.pt` is the built-in narrator ("Studio Narrator" in the app).
+- **Code**: `resemble-ai/chatterbox` commit `5de7a54aa4e5e2baadb0182dde554908b48b85c2`, LICENSE: "MIT License / Copyright (c) 2025 Resemble AI / Permission is hereby granted, free of charge, to any person obtaining a copy of this software...". PyPI `chatterbox-tts` 0.1.7 (uploaded 2026-03-26), licence field "MIT License / Copyright (c) 2025 Resemble AI".
+- **Training data**: the card says only "Trained on 0.5M hours of cleaned data". No dataset is named, so we could not check it, as with Kokoro's synthetic sources. The weights' own licence is MIT.
+- **Watermark**: the card says "Every audio file generated by Chatterbox includes Resemble AI's Perth (Perceptual Threshold) Watermarker - imperceptible neural watermarks that survive MP3 compression, audio editing, and common manipulations". The watermarker (`resemble-perth` 1.0.1, `resemble-ai/perth` @ff1c8ac) is MIT. It does not restrict use. It marks the audio as AI-generated, and the app says so in the clone panel and the docs.
+- **Selling audiobooks**: MIT puts no limit on the use of output. People can sell audiobooks made with the studio voice or with a clone of a voice they have the right to use. The app asks once that users confirm they have that right (their own voice, the speaker's permission, or a public-domain recording); see `backend/consent.py`.
+- **Dependencies**: `s3tokenizer` 0.3.0 is Apache-2.0 (`xingchensong/S3Tokenizer` @9bf5d84). `pykakasi` 2.3.0 is GPL-3.0-or-later. It is a hard dependency of `chatterbox-tts` for the multilingual model, which Text2Audio does not use. As with espeak-ng, pip installs it on the user's machine and Text2Audio redistributes nothing, so the section 6 condition applies.
+- **Verdict: ALLOWED.** Keep the MIT notices and credit Resemble AI.
 
-## 2. F5-TTS weights (`F5TTS_v1_Base`)
+## 2. November 2026 model shortlist
 
-- Pinned: HF `SWivid/F5-TTS` sha `84e5a410d9cead4de2f847e7c9369a6440bdfaca`. The repo has no separate LICENSE file; the only licence text is the card's `license:` field.
-- Card front matter: `license: cc-by-nc-4.0` ... `datasets: - amphion/Emilia-Dataset`.
-- Default checkpoint, from `src/f5_tts/api.py` @45868ab: `model="F5TTS_v1_Base"` and `repo_name, ckpt_step, ckpt_type = "F5-TTS", 1250000, "safetensors"`. So it downloads `hf://SWivid/F5-TTS/F5TTS_v1_Base/model_1250000.safetensors`.
-- Upstream says the NC licence comes from the training data: "The pre-trained models are licensed under the CC-BY-NC license due to the training data Emilia".
-- **Verdict: BLOCKED as currently shipped.** Text2Audio's Voices page shows a "Clone a voice" panel with no licence notice. A grep of `web/index.html` and `web/js/voices.js` for "commercial" or "licen" finds nothing. The only notices are in README.md and THIRD_PARTY_LICENSES.md, so a user can make a cloned-voice audiobook and sell it without ever being told about the restriction.
-- **Gate that makes it ALLOWED-WITH-CONDITIONS:** (a) keep F5 opt-in. It already is: INSTALL.md has the user run `pip install f5-tts` themselves. (b) Show a clear notice in the clone panel and on any render that uses a cloned voice: "Cloned voices use F5-TTS weights licensed CC-BY-NC-4.0. Non-commercial use only." (c) Require one acknowledgement checkbox before the first clone. (d) Write a "non-commercial (F5-TTS CC-BY-NC-4.0)" note into the exported file's metadata or the book's details. (e) JMS Dev Lab must never use cloned output commercially, and must never make cloning a default. CC-BY-NC also requires attribution, so give credit to SWivid/F5-TTS with a link to the licence.
+John's rule (2026-11-03): only models whose **code and weights** are under a real open-source licence (MIT, Apache-2.0, BSD or similar) that allows commercial use. Vendor "open model" licences, non-commercial licences and anything needing a paid licence are out. Each licence was read from the model card front matter (Hugging Face API `cardData`) and the code repo's LICENSE at the pinned revision. The cards were saved with the bake-off evidence.
 
-## 3. Emilia dataset
+| Model (released) | Weights licence @ revision | Code licence @ commit | Verdict | Bake-off on this PC |
+|---|---|---|---|---|
+| **Chatterbox** (English, 0.5B; Apr 2025, card updated Jun 2026) | MIT @5bb1f6e | MIT @5de7a54 | **PERMITTED. Chosen** | Yes (winner) |
+| Chatterbox Multilingual V3 (0.5B; 2026) | MIT @5bb1f6e (same repo) | MIT @5de7a54 | PERMITTED | Yes |
+| Chatterbox-Turbo (350M; Dec 2025) | MIT @749d1c1 | MIT @5de7a54 | PERMITTED | Yes |
+| Chatterbox-Nano (110M; Apr 2026) | MIT @71ccd1d | MIT @5de7a54 | PERMITTED | Yes |
+| Qwen3-TTS 12Hz 1.7B Base / CustomVoice (Jan 2026) | Apache-2.0 @fd4b254 / @0c0e305; tokenizer Apache-2.0 @7dd38ad | Apache-2.0 @022e286 (`QwenLM/Qwen3-TTS`) | PERMITTED | Yes |
+| VoxCPM2 (2B; Apr 2026) | Apache-2.0 @32279ef ("free for commercial use") | Apache-2.0 @cce58a5 (`OpenBMB/VoxCPM`) | PERMITTED | Yes |
+| Audio8-TTS-Realistic-Air (0.6B; Oct 2026) | Apache-2.0 @23c305c (LICENSE and NOTICE in repo) | Apache-2.0 @1d64afc (`Edge0-AI/Audio8_TTS`) | PERMITTED. Runs `trust_remote_code` | Yes |
+| Ming-3.0-tts-0.5B (Sep 2026) | MIT @7247f4c | MIT @a39b806 (`inclusionAI/Ming-3.0-tts`) | PERMITTED | Yes |
+| Kokoro-82M (baseline) | Apache-2.0 @f3ff357 | Apache-2.0 @dfb907a | PERMITTED | Yes (baseline) |
+| Tencent AuK (1.5B; Aug 2026) | MIT @790742b ("refers solely to training code, inference code, parameters, and weights") | MIT @0d40366 | **BLOCKED**: it needs `Qwen/Qwen2.5-Omni-3B` as its text encoder (README: "The current implementation uses Qwen2.5-Omni-3B"), and that model is `qwen-research` @f75b40e: "FOR NON-COMMERCIAL PURPOSES ONLY" | No |
+| NVIDIA Magpie TTS Multilingual 357M | `nvidia-open-model-license` @446bff5 | n/a | EXCLUDED: vendor licence, not open source (John's rule) | No |
+| Fish Audio S2 Pro (Mar 2026), Fish Drama-3 (Oct 2026) | `fish-audio-research-license` @1de9996 / @78e5ab7 | n/a | EXCLUDED: research licence; commercial use needs a paid licence | No |
+| Mistral Voxtral-4B-TTS-2603 | CC-BY-NC-4.0 @b81be46 | n/a | EXCLUDED: non-commercial | No |
+| BreezeBlue Breeze-TTS-2 (Aug 2026) | `breezeblue-research-and-non-commercial-license` @3e28c51 | n/a | EXCLUDED: non-commercial | No |
+| Boson Higgs TTS 3 4B (Jun 2026) | `boson-higgs-tts-3-research-and-non-commercial-license` @239f63f | n/a | EXCLUDED: non-commercial | No |
+| k2-fsa OmniVoice (Mar 2026) | Card: "The pre-trained model is licensed under the CC-BY-NC due to constraints from its training data (e.g., Emilia)" @c5fdb5c | Apache-2.0 | EXCLUDED: non-commercial weights | No |
+| IndexTTS-2.5 (Aug 2026) | `bilibili-model-license` @c39ce5b | n/a | EXCLUDED: vendor licence | No |
+| Supertonic-3 (May 2026) | OpenRAIL @3cadd1e | n/a | EXCLUDED: use-restricted RAIL licence, not open source | No |
+| Kitten TTS 2 (Sep 2026) | `stellon-labs-community-license` @c93cb7c | n/a | EXCLUDED: vendor licence | No |
+| Audio8-TTS-Preview-0.1b (Aug 2026) | `audio8-community-license-v1.0` @8c83702 | n/a | EXCLUDED: vendor licence (the 0.6B models above are Apache-2.0) | No |
+| Kyutai Pocket TTS / TTS 1.6B | CC-BY-4.0 @db04f0e / @f654396 | MIT/Apache | EXCLUDED: CC-BY-4.0 allows commercial use with attribution, but it is a content licence, not an MIT/Apache/BSD-style software licence (John's rule) | No |
+| Microsoft VibeVoice-1.5B | MIT @c00898d | MIT @16fb2cb | PERMITTED by licence, not tested. The card says "We do not recommend using VibeVoice in commercial or real-world applications without further testing and development. This model is intended for research and development purposes only." | No |
+| Fun-CosyVoice3-0.5B, MOSS-TTS, GLM-TTS, Maya-2-Native, OpenF5-TTS-Base, Phonon-31M-en, Inflect-Micro-v2 | Apache-2.0 @29e01c4, Apache-2.0 @b6b0229, MIT @b3feb69, Apache-2.0 @87a83ef, Apache-2.0 @28e45df, Apache-2.0 @92741c5, Apache-2.0 @9d86284 | Apache-2.0 / MIT | PERMITTED by licence, not tested (time; ranked below the tested models on their own published English results, or Indic-first, or tiny CPU models) | No |
 
-- Pinned: HF `amphion/Emilia-Dataset` sha `d7f2f7340a6385696f3766c8049fa920a4707c07`. The dataset is gated (`gated: auto`) and its README cannot be fetched without logging in. The terms were read from the public API `cardData` (`https://huggingface.co/api/datasets/amphion/Emilia-Dataset`).
-- Card `license: cc-by-4.0`. The gate terms say: "1. The researcher shall use the Emilia dataset under the CC-BY-NC license and the Emilia-YODAS dataset under the CC-BY license."
-- Amphion GitHub (`open-mmlab/Amphion` @26f6883, `preprocessors/Emilia/README.md`): "Emilia-Large combines the original 101k-hour Emilia dataset (licensed under `CC BY-NC 4.0`) with the brand-new 114k-hour **Emilia-YODAS dataset** (licensed under `CC BY 4.0`)". It also says: "Users are permitted to use this dataset only for non-commercial purposes under the CC BY-NC-4.0 license."
-- **Do trained weights inherit the restriction?** The Emilia terms we could read say nothing about models trained on the data. The inheritance comes from F5's own statement, which licenses its weights CC-BY-NC "due to the training data Emilia". Treat F5 weights as NC either way. A model trained only on Emilia-YODAS (CC-BY) would not carry the NC term, but we found no verified permissive F5 checkpoint.
+The bake-off results and samples are in the maintainer's evidence folder and summarised in docs/RELEASE-NOTES-1.5.0.md.
 
-## 4. Vocos
+## 3. Removed in 1.5.0: F5-TTS
 
-- Weights: HF `charactr/vocos-mel-24khz` sha `0feb3fdd929bcd6649e0e7c5a688cf7dd012ef21`. Card front matter `license: mit`; the card text says "The code in this repository is released under the MIT license."
-- Code: `gemelo-ai/vocos` @`eb39abfc42c1dee4854d9b10d44dd7d4fd3b0e53`, "MIT License / Copyright (c) 2023 Charactr Inc."
-- **Verdict: ALLOWED.** Keep the MIT notice.
+1.4 cloned voices with F5-TTS. Its code is MIT (`SWivid/F5-TTS` @45868ab), but its weights (`F5TTS_v1_Base`, HF `SWivid/F5-TTS` @84e5a41) are CC-BY-NC-4.0 "due to the training data Emilia". The Vocos vocoder (`charactr/vocos-mel-24khz` @0feb3fd, MIT) was used only by F5. Chatterbox replaces both, with permissive weights and better measured cloning. Text2Audio 1.5 no longer installs or runs F5. Audiobooks made with a cloned voice before 1.5 keep their "non-commercial (F5-TTS CC-BY-NC-4.0)" mark in the library. Re-rendering them with 1.5 removes it, because the new audio no longer comes from F5.
+
+## 4. Kokoro stays
+
+Kokoro is kept as the light, fast engine for PCs without an NVIDIA graphics card. It is about 40 times faster than Chatterbox on the test PC, it runs faster than real time on a CPU, and its narration measured as well as Chatterbox's. See section 5 for its licence.
 
 ## 5. Kokoro-82M, `kokoro`, `misaki`
 
@@ -114,21 +138,22 @@ PyPI versions are the latest on PyPI on 2026-11-03 (`https://pypi.org/pypi/<name
 - Why lessac blocks the voices built on it: the Blizzard 2013 Lessac licence (fetched 2026-11-03) grants use "exclusively for Research Purposes only", and its definition "excludes ... using the Materials for any commercial purpose, including the development, marketing, commercialisation, sale or licencing of voice synthesis ... products or services". It adds: "the Audio Book Recordings are not licenced under this Agreement for use as audio books".
 - **Verdict:** Piper is **not** a clean permissive alternative. The maintained code is GPL-3.0 and embeds espeak-ng. Most common English voices are lessac-based or NC. The only defensible candidates we found are `en_US-ljspeech` and `en_GB-cori`. They are public-domain data trained from scratch, but they are community uploads with no explicit weight licence beyond the repo's MIT tag. **Conditions:** use the archived MIT `rhasspy/piper` runtime, or accept GPL-3.0 for `piper-tts` (fine if not redistributed bundled; see section 6). Ship only an allow-list of those two voices, and record each voice's MODEL_CARD.
 
-## 8. Python dependencies (PyPI JSON, 2026-11-03)
+## 8. Python dependencies (PyPI JSON, 2026-11-03 and 2026-11-04)
 
 - fastapi 0.162.0: `license_expression: MIT`. ALLOWED.
 - uvicorn 0.54.0: `BSD-3-Clause`. ALLOWED.
 - soundfile 0.14.0: "BSD 3-Clause License". Its README says libsndfile "is a free, cross-platform, open-source (LGPL) library" and that the Windows wheels ship "own copy of libsndfile in the wheel". ALLOWED-WITH-CONDITIONS: libsndfile is loaded dynamically, which is LGPL-compliant. If Text2Audio ever bundles it, include the LGPL text and keep it replaceable.
-- numpy 2.5.4: `BSD-3-Clause AND 0BSD AND MIT AND Zlib AND CC0-1.0`. ALLOWED.
+- numpy 1.26.4 (Chatterbox requires numpy < 2 on Python < 3.13): classifier "BSD License". ALLOWED.
 - python-multipart 0.0.33: `Apache-2.0`. ALLOWED.
 - aiofiles 25.1.0: `Apache-2.0`. ALLOWED.
 - num2words 0.5.14: "LGPL" (classifier "GNU Library or Lesser General Public License (LGPL)"). ALLOWED-WITH-CONDITIONS: use it unmodified as an imported library. If it is ever bundled, include the LGPL text.
 - pypdf 6.21.4: `BSD-3-Clause`. ALLOWED.
-- gradio 6.31.0: `Apache-2.0`. ALLOWED.
-- torch 2.15.0: `Apache-2.0 AND Apache-2.0 WITH LLVM-exception AND BSD-2-Clause AND BSD-3-Clause AND BSL-1.0 AND ISC AND MIT AND Zlib`. ALLOWED.
-- torchaudio 2.11.1: classifier "BSD License". ALLOWED.
+- gradio 6.8.0 (pinned by `chatterbox-tts`): `Apache-2.0`. ALLOWED.
+- torch 2.6.0 (pinned by `chatterbox-tts`): `BSD-3-Clause`. torchaudio 2.6.0: classifier "BSD License". ALLOWED.
 - spacy 3.8.18: MIT. spacy-curated-transformers 2.1.2: MIT. en_core_web_sm: MIT (HF card). ALLOWED.
-- transformers 5.22.1: "Apache 2.0 License". ALLOWED.
+- transformers 5.2.0 (pinned by `chatterbox-tts`): "Apache 2.0 License". ALLOWED.
+- Chatterbox's other pins: diffusers 0.29.0 "Apache 2.0 License"; safetensors 0.5.3 "Apache Software License"; conformer 0.3.2 MIT; librosa 0.11.0 ISC; pyloudnorm 0.2.0 MIT; omegaconf 2.4.0 "BSD License"; spacy-pkuseg 1.0.2 MIT; s3tokenizer 0.3.0 "Apache2.0"; resemble-perth 1.0.1 "MIT License". ALLOWED.
+- pykakasi 2.3.0: `GPL-3.0-or-later` (see sections 1 and 6).
 - phonemizer-fork 3.3.2: GPLv3+ (see section 6).
 
 ## 9. ffmpeg
@@ -140,21 +165,13 @@ PyPI versions are the latest on PyPI on 2026-11-03 (`https://pypi.org/pypi/<name
 
 ---
 
+
 ## What this means for Text2Audio
 
-1. **Kokoro narration, the default, is clean.** Apache-2.0 weights, voices and code. People can sell audiobooks made with it. Keep the Apache credit.
-2. **Voice cloning (F5-TTS) is non-commercial.** The weights are CC-BY-NC-4.0. The app currently says so only in the README, not where people clone. Add an in-app notice and a one-time acknowledgement, tag cloned exports as non-commercial, and keep it opt-in. JMS Dev Lab must not use cloned output commercially.
-3. **GPL parts are fine while the user's own machine installs them.** That covers espeak-ng, the espeak-ng DLL inside `espeakng-loader`, `phonemizer-fork`, and the gyan.dev ffmpeg. They become a problem only if Text2Audio ships a bundled build. If it ever does, ship that bundle under GPL-3.0 terms with source.
-4. **Piper is not the permissive alternative the PRD assumed.** Current Piper is GPL-3.0, and most English voices derive from the research-only Lessac data or are NC. Only `en_US-ljspeech` and `en_GB-cori` look usable, and those need an allow-list.
+1. **Every model Text2Audio runs is open source and allows commercial use.** Chatterbox (MIT) narrates the studio voice and clones voices. Kokoro (Apache-2.0) is the fast engine. People can sell the audiobooks they make, including with a cloned voice they have the right to use. Keep the MIT and Apache credits.
+2. **The cloning gate now asks about voice rights, not licences.** Users confirm once that they may clone the voices they upload. Older F5 books keep their non-commercial mark.
+3. **Chatterbox audio carries an inaudible Perth watermark** that identifies it as AI-generated. This is disclosed in the app and the docs.
+4. **GPL parts are fine while the user's own machine installs them.** That covers espeak-ng, the espeak-ng DLL inside `espeakng-loader`, `phonemizer-fork`, `pykakasi` and the gyan.dev ffmpeg. They become a problem only if Text2Audio ships a bundled build. If it ever does, ship that bundle under GPL-3.0 terms with source.
+5. **Piper is not the permissive alternative the PRD assumed.** Current Piper is GPL-3.0, and most English voices derive from the research-only Lessac data or are NC. Only `en_US-ljspeech` and `en_GB-cori` look usable, and those need an allow-list.
 
-## Corrections to THIRD_PARTY_LICENSES.md
-
-1. **"espeak-ng ... installed separately, not redistributed" is incomplete.** Kokoro's own dependency chain (`kokoro` → `misaki[en]` → `espeakng-loader` 0.2.4) pip-installs a bundled `espeak-ng.dll` (GPL-3.0) with no licence file in the wheel. It also pulls in `phonemizer-fork` (GPL-3.0-or-later), which the file does not mention.
-2. **"ffmpeg (LGPL/GPL depending on build)" is vague.** The installer installs `Gyan.FFmpeg`, and gyan.dev states every one of its builds is GPLv3.
-3. **The F5 weights note is accurate, but the notice is missing from the app.** "Outputs of the cloning feature are restricted to non-commercial use" appears only in docs; the clone UI says nothing.
-4. **The "Python libraries" section implies everything is permissive.** `num2words` is LGPL, `phonemizer-fork` is GPL-3.0+, and soundfile bundles LGPL libsndfile. The F5 dependency `vocos` has no licence in its PyPI metadata; its repo LICENSE is MIT.
-5. **No upstream attribution is listed.** That is required by Apache-2.0 (Kokoro, misaki), CC-BY-NC-4.0 (F5 weights) and MIT (F5 code, Vocos). Add a short credits block with links to the licences.
-6. **Kokoro, F5 code MIT, F5 weights CC-BY-NC-4.0, and Vocos MIT were all confirmed correct.**
-7. **PRD claim to correct:** "Piper is a permissive alternative" is wrong. See section 7.
-
-Evidence: raw licence texts and model cards were captured at the pinned revisions above on 2026-11-03 (kept in the maintainer's release evidence, not in this repository).
+Evidence: raw licence texts and model cards were captured at the pinned revisions above on 2026-11-03 and 2026-11-04 (kept in the maintainer's release evidence, not in this repository).

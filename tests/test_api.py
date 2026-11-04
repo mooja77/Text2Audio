@@ -363,7 +363,7 @@ def test_clone_refused_until_acknowledged(client):
     assert r.status_code == 403
     body = r.json()
     assert body["error"] == "consent_required"
-    assert body["license"] == "CC-BY-NC-4.0" and body["attribution"] == "SWivid/F5-TTS"
+    assert body["license"] == "MIT" and body["attribution"] == "ResembleAI/chatterbox"
     assert sorted(os.listdir(server.voices.base)) == before
     assert client.get("/api/clone-consent").json()["acknowledged"] is False
     _ack(client)
@@ -371,6 +371,34 @@ def test_clone_refused_until_acknowledged(client):
     assert state["acknowledged"] is True and state["acknowledgedAt"]
     files = {"audio": ("ref.wav", _wav_bytes(), "audio/wav")}
     assert client.post("/api/voices/clone", files=files, data={"name": "N"}).status_code == 200
+
+
+def test_old_f5_licence_acknowledgement_does_not_count(client):
+    """1.4 stored a CC-BY-NC licence acknowledgement; 1.5 asks a different question."""
+    import json, server
+    os.makedirs(os.path.dirname(server.CONSENT_PATH), exist_ok=True)
+    with open(server.CONSENT_PATH, "w", encoding="utf-8") as f:
+        json.dump({"acknowledged": True, "acknowledgedAt": "2026-11-01T10:00:00"}, f)
+    assert client.get("/api/clone-consent").json()["acknowledged"] is False
+    _ack(client)
+    state = client.get("/api/clone-consent").json()
+    assert state["acknowledged"] is True and state["kind"] == "voice-rights-v1"
+
+
+def test_voices_list_studio_narrator_first(client):
+    voices = client.get("/api/voices").json()
+    assert voices[0]["id"] == "studio_narrator" and voices[0]["kind"] == "studio"
+    assert voices[0]["engine"] == "chatterbox"
+    kokoro = [v for v in voices if v["kind"] == "preset"]
+    assert kokoro and all(v["engine"] == "kokoro" for v in kokoro)
+
+
+def test_health_reports_default_voice(client, monkeypatch):
+    import server
+    monkeypatch.setattr(server, "studio_engine_available", lambda: True)
+    assert client.get("/api/health").json()["defaultVoice"] == "studio_narrator"
+    monkeypatch.setattr(server, "studio_engine_available", lambda: False)
+    assert client.get("/api/health").json()["defaultVoice"] == "af_heart"
 
 
 def test_clone_consent_rejects_false_and_heals_corrupt_file(client):
@@ -421,8 +449,10 @@ def test_licenses_lists_in_use_components(client):
     r = client.get("/api/licenses")
     assert r.status_code == 200
     comps = {c["name"]: c for c in r.json()["components"]}
-    f5 = next(c for n, c in comps.items() if n.startswith("F5-TTS weights"))
-    assert f5["license"] == "CC-BY-NC-4.0" and f5["commercial"] is False
+    assert not any(n.startswith("F5-TTS") for n in comps)  # removed in 1.5.0
+    cb = next(c for n, c in comps.items() if n.startswith("Chatterbox weights"))
+    assert cb["license"] == "MIT" and cb["commercial"] is True and cb["verdict"] == "ALLOWED"
+    assert all(c["commercial"] for c in comps.values())  # nothing non-commercial in use
     kokoro = comps["Kokoro-82M weights and voices"]
     assert kokoro["license"] == "Apache-2.0" and kokoro["commercial"] is True
     assert not any("Piper" in n for n in comps)  # proposed, not in use
@@ -445,7 +475,7 @@ def test_licence_record_ships_in_the_wheel():
 
 
 def test_render_and_preview_with_clone_need_consent_even_if_clone_was_not_made_through_the_gate(client, monkeypatch):
-    """A clone restored from a backup must not bypass the CC-BY-NC notice."""
+    """A clone restored from a backup must not bypass the voice-rights acknowledgement."""
     import os
     import server
     monkeypatch.setattr(server, "SYNTH_FACTORY", _FakeSynth)

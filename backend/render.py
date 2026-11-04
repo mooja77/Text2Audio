@@ -13,7 +13,8 @@ from pipeline.synth import Synthesizer, PRESET_VOICES, SAMPLE_RATE
 from pipeline.synth import SENTENCE_GAP, PARAGRAPH_GAP
 from pipeline.assemble import write_wav, build_m4b, DEFAULT_BITRATE
 from pipeline.normalize import normalize_text
-from pipeline.clone_synth import ClonedSynthesizer
+from pipeline.clone_synth import ClonedSynthesizer, NeuralSynthesizer
+from pipeline.engines import DEFAULT_ENGINE, STUDIO_VOICES
 
 WAV_SUBDIR = "wav"
 
@@ -36,21 +37,47 @@ class UnknownVoiceError(ValueError):
         self.voice_id = voice_id
 
 
-def validate_voice(voice_id, voice_store) -> None:
-    """Raise UnknownVoiceError unless voice_id is a preset or a stored clone."""
+def engine_for(voice_id) -> str:
+    """Which engine narrates this voice: Kokoro presets, otherwise the neural engine."""
     if voice_id in PRESET_VOICES:
+        return "kokoro"
+    if voice_id in STUDIO_VOICES:
+        return STUDIO_VOICES[voice_id]["engine"]
+    return DEFAULT_ENGINE
+
+
+def chunk_cache_key(voice_id, speed, text) -> dict:
+    """Cache key for one narrated chunk.
+
+    Kokoro keeps the 1.4 key, so existing Kokoro caches stay valid. Neural voices
+    include the engine and a new version: a 1.4 clone was narrated by F5-TTS
+    (CC-BY-NC-4.0), and that audio must never be reused for a 1.5 render of the
+    same voice id."""
+    engine = engine_for(voice_id)
+    if engine == "kokoro":
+        return {"version": 1, "voice": voice_id, "speed": float(speed), "text": text}
+    return {"version": 2, "engine": engine, "voice": voice_id, "speed": float(speed),
+            "text": text}
+
+
+def validate_voice(voice_id, voice_store) -> None:
+    """Raise UnknownVoiceError unless voice_id is a preset, a studio voice or a stored clone."""
+    if voice_id in PRESET_VOICES or voice_id in STUDIO_VOICES:
         return
     if voice_store.get(voice_id) is None:
         raise UnknownVoiceError(voice_id)
 
 
 def resolve_synthesizer(voice_id, speed, voice_store, factory=_default_synth_factory):
-    """Return a ready synthesizer for voice_id (preset -> Kokoro, clone -> F5).
+    """Return a ready synthesizer for voice_id.
 
-    Raises UnknownVoiceError (never KeyError) for any other id.
+    Kokoro preset -> in-process Kokoro; studio voice or clone -> the neural engine
+    (Chatterbox) in its worker. Raises UnknownVoiceError (never KeyError) otherwise.
     """
     if voice_id in PRESET_VOICES:
         return factory(voice_id, speed)
+    if voice_id in STUDIO_VOICES:
+        return NeuralSynthesizer(voice=voice_id, speed=float(speed))
     meta = voice_store.get(voice_id)
     if meta is None:
         raise UnknownVoiceError(voice_id)
@@ -121,8 +148,7 @@ def _render_into(workdir, chapters, *, voice, speed, title, author, cover_path,
                             if wrote_audio:
                                 gap = PARAGRAPH_GAP if ci == 0 and pi > 0 else SENTENCE_GAP
                                 wav.write(np.zeros(int(gap * SAMPLE_RATE), dtype=np.float32))
-                            cache_key = {"version": 1, "voice": voice, "speed": float(speed),
-                                         "text": chunk}
+                            cache_key = chunk_cache_key(voice, speed, chunk)
                             audio = chunk_cache.get(cache_key) if chunk_cache else None
                             if audio is None:
                                 audio = synth.synth_chunk_with_retry(chunk)
@@ -149,7 +175,7 @@ def _render_into(workdir, chapters, *, voice, speed, title, author, cover_path,
             chapter_wavs.append((ch.title, os.path.join(workdir, rel)))
             wav_files.append(rel)
     finally:
-        # Deterministically tear down the synthesizer (e.g. the F5 subprocess)
+        # Deterministically tear down the synthesizer (e.g. the engine subprocess)
         # rather than waiting for garbage collection.
         if hasattr(synth, "close"):
             synth.close()
@@ -183,10 +209,8 @@ def _render_into(workdir, chapters, *, voice, speed, title, author, cover_path,
         "durationSeconds": round(total_ms / 1000, 1), "sizeBytes": os.path.getsize(out),
         "chapters": chapters_meta, "coverFile": "cover.jpg" if cover_dest else None,
         "wavKept": True, "wavFiles": wav_files, "bitrate": DEFAULT_BITRATE, "mastered": True,
+        "engine": engine_for(voice),
     }
-    if voice not in PRESET_VOICES:  # a stored clone (F5-TTS weights, CC-BY-NC-4.0)
-        manifest["license"] = "non-commercial (F5-TTS CC-BY-NC-4.0)"
-        manifest["licenseAttribution"] = "SWivid/F5-TTS"
     library.save_manifest(job_id, manifest)
     emit({"type": "done", "libraryId": job_id, "percent": 100})
     return manifest

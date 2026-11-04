@@ -83,8 +83,9 @@ folder).
 
 When you're finished, just close the black window.
 
-> The **first** time you generate audio, the voice model (a few hundred MB) downloads
-> once. After that, Text2Audio works completely offline.
+> The **first** time you generate audio, the voice model downloads once: a few hundred
+> MB for the fast Kokoro voices, or about 3.2 GB for the studio voice and cloning.
+> After that, Text2Audio works completely offline.
 
 ---
 
@@ -102,39 +103,29 @@ Nothing is uploaded anywhere — your text and audio never leave your computer.
 
 ---
 
-## Adding voice cloning (optional)
+## The studio voice and voice cloning
 
-Text2Audio can narrate in a cloned voice using a heavier optional engine called
-**F5-TTS**. It's not installed by default (it's large and slower). To add it:
+The installer sets up both voice engines:
 
-1. Open the Text2Audio folder.
-2. Hold **Shift**, right-click an empty area, and choose
-   **Open PowerShell window here** (or **Open in Terminal**).
-3. Install F5-TTS:
+- **Studio Narrator** (Chatterbox by Resemble AI). This is the best-sounding voice and
+  the default when your PC has an NVIDIA graphics card. It is much slower than the fast
+  voices: on our test PC a book took about one and a half times as long to make as it
+  lasts (a 10-hour book takes about 15 hours).
+- **Fast voices** (Kokoro). Fifteen British and American voices that work on any PC.
+  On a PC without an NVIDIA graphics card these are the default.
 
-   ```powershell
-   .\.venv\Scripts\python.exe -m pip install f5-tts
-   ```
+To clone a voice, go to **Voices → Clone a voice**. Tick the box once to confirm you
+have the right to clone the voice. Then give it a name and upload 10–30 seconds of
+clean speech from one person. Cloned voices use the studio engine, so they need a
+graphics card too.
 
-4. Re-pin `torchaudio` so it matches the rest of the app (F5-TTS sometimes pulls a
-   mismatched version). Use the line that matches your machine:
+You may sell audiobooks made with the studio voice or with a clone of a voice you have
+the right to use: both engines are open source and allow commercial use. Studio and
+cloned audio carry an inaudible watermark that marks them as AI-generated.
 
-   - **NVIDIA GPU** (the installer set up the CUDA build):
-
-     ```powershell
-     .\.venv\Scripts\python.exe -m pip install "torchaudio==2.6.0" --index-url https://download.pytorch.org/whl/cu124
-     ```
-
-   - **No NVIDIA GPU** (CPU build — leave off the CUDA index, or you'll pull a GPU build
-     onto a CPU-only setup and break it):
-
-     ```powershell
-     .\.venv\Scripts\python.exe -m pip install "torchaudio==2.6.0"
-     ```
-
-Then start the app and go to **Voices → Clone a voice**: give it a name, upload about
-10–30 seconds of clean speech, and optionally paste a transcript of that clip for the
-best quality.
+Already using Text2Audio 1.4 or earlier? Run **Install Text2Audio.bat** again to add
+the new engine. It replaces the optional F5-TTS cloning engine, which you can remove
+with `.\.venv\Scripts\python.exe -m pip uninstall f5-tts`.
 
 > ⚠️ **Only clone voices you have the right to use** — your own voice, voices you have
 > permission to clone, or public-domain recordings. Don't impersonate people or create

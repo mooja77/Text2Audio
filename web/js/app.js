@@ -99,6 +99,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     try { saved = JSON.parse(localStorage.getItem("text2audio.settings") || "{}"); }
     catch { localStorage.removeItem("text2audio.settings"); }
     if (saved.voice && T2A.state.voices.some(v => v.id === saved.voice)) T2A.state.voice = saved.voice;
+    else if (health.defaultVoice && T2A.state.voices.some(v => v.id === health.defaultVoice)) T2A.state.voice = health.defaultVoice;
     if (Number.isFinite(saved.speed)) T2A.state.speed = saved.speed;
     T2A.state.firstValue = (await T2A.api("/api/library")).length > 0;
   } catch (e) { T2A.alert("Backend not reachable"); }

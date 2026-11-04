@@ -43,6 +43,19 @@ def test_text2audio_resolver_clone_builds_cloned_synth(monkeypatch):
     assert captured == {"ref": "/refs/v0a1b2c3d4.wav", "text": "hello", "speed": 0.9}
 
 
+def test_text2audio_resolver_studio_voice_uses_neural_engine(monkeypatch):
+    captured = {}
+
+    class FakeNeural:
+        def __init__(self, voice=None, speed=1.0):
+            captured.update(voice=voice, speed=speed)
+
+    monkeypatch.setattr(render, "NeuralSynthesizer", FakeNeural)
+    out = resolve_synthesizer("studio_narrator", 0.95, _Store({}))
+    assert isinstance(out, FakeNeural)
+    assert captured == {"voice": "studio_narrator", "speed": 0.95}
+
+
 def test_text2audio_resolver_unknown_raises_unknown_voice_error():
     with pytest.raises(UnknownVoiceError) as exc:
         resolve_synthesizer("nope", 1.0, _Store({}))
