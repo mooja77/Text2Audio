@@ -28,7 +28,7 @@ def test_resample_changes_length():
 
 
 class _FakeProc:
-    """Stands in for the F5 worker subprocess."""
+    """Stands in for the engine worker subprocess."""
     def __init__(self, ready_line, resp_line):
         self._lines = [ready_line, resp_line]
         self.stdin = io.StringIO()
@@ -45,13 +45,50 @@ class _FakeProc:
         self._killed = True
 
 
-def test_start_worker_raises_when_f5_missing(monkeypatch):
+def test_start_worker_raises_install_hint_when_engine_missing(monkeypatch):
     # worker that never prints {"ready": true} -> install error
+    from pipeline.engines import INSTALL_HINT
     def fake_popen(*a, **k):
         return _FakeProc(ready_line="", resp_line="")
     monkeypatch.setattr(cs.subprocess, "Popen", fake_popen)
-    with pytest.raises(RuntimeError, match="f5-tts"):
+    with pytest.raises(RuntimeError) as exc:
         _start_worker()
+    assert str(exc.value) == INSTALL_HINT
+
+
+def test_worker_is_started_with_the_engine_name(monkeypatch):
+    from pipeline.engines import DEFAULT_ENGINE
+    seen = {}
+    def fake_popen(cmd, **k):
+        seen["cmd"] = cmd
+        return _FakeProc(json.dumps({"ready": True}) + "\n", "")
+    monkeypatch.setattr(cs.subprocess, "Popen", fake_popen)
+    _start_worker()
+    assert seen["cmd"][-2:] == ["pipeline.engine_worker", DEFAULT_ENGINE]
+
+
+def test_preset_voice_request_names_the_voice(monkeypatch, tmp_path):
+    wavpath = str(tmp_path / "out.wav")
+    sf.write(wavpath, np.ones(480, dtype=np.float32), 48000)  # resampled to 24 kHz
+    proc = _FakeProc(ready_line=json.dumps({"ready": True}) + "\n",
+                     resp_line=json.dumps({"wav": wavpath, "sr": 48000}) + "\n")
+    monkeypatch.setattr(cs.subprocess, "Popen", lambda *a, **k: proc)
+    s = cs.NeuralSynthesizer(voice="studio_voice", speed=1.1)
+    out = s.synth_chunk("hello")
+    req = json.loads(proc.stdin.getvalue().splitlines()[0])
+    assert req == {"text": "hello", "voice": "studio_voice", "ref": None, "ref_text": "",
+                   "speed": 1.1}
+    assert out.shape[0] == 240
+
+
+def test_engine_error_reply_is_retried_then_aborts(monkeypatch):
+    from pipeline.synth import ChunkSynthError
+    s = ClonedSynthesizer.__new__(ClonedSynthesizer)
+    s.voice, s.ref_wav, s.ref_text, s.speed = None, "ref.wav", "", 1.0
+    lines = [json.dumps({"error": "RuntimeError: bad"}) + "\n"] * 2
+    s._proc = _FakeProc(*lines)
+    with pytest.raises(ChunkSynthError, match="bad"):
+        s.synth_chunks(["text"])
 
 
 def test_synth_chunk_round_trips_via_worker(monkeypatch, tmp_path):
@@ -69,7 +106,7 @@ def test_synth_chunk_round_trips_via_worker(monkeypatch, tmp_path):
 def test_worker_timeout_becomes_fatal_error(monkeypatch):
     from pipeline.synth import FatalSynthError
     s = ClonedSynthesizer.__new__(ClonedSynthesizer)
-    s.ref_wav, s.ref_text, s.speed = "ref.wav", "", 1.0
+    s.voice, s.ref_wav, s.ref_text, s.speed = None, "ref.wav", "", 1.0
     s._proc = _FakeProc("", "")
     monkeypatch.setattr(cs, "_readline_with_timeout",
                         lambda *a, **k: (_ for _ in ()).throw(TimeoutError()))
@@ -77,11 +114,21 @@ def test_worker_timeout_becomes_fatal_error(monkeypatch):
         s.synth_chunk("hello")
 
 
-@pytest.mark.skipif(os.environ.get("RUN_F5") != "1",
-                    reason="Set RUN_F5=1 to run the real F5 subprocess smoke test")
-def test_f5_smoke(tmp_path):
-    ref = str(tmp_path / "ref.wav")
-    sf.write(ref, np.zeros(SAMPLE_RATE, dtype=np.float32), SAMPLE_RATE)
-    s = ClonedSynthesizer(ref, ref_text="hello there friend", speed=1.0)
-    audio = s.synth_chunk("Hello there, this is a test.")
-    assert isinstance(audio, np.ndarray) and audio.shape[0] > 0
+@pytest.mark.skipif(os.environ.get("RUN_CHATTERBOX") != "1",
+                    reason="Set RUN_CHATTERBOX=1 to run the real Chatterbox worker smoke test")
+def test_chatterbox_smoke(tmp_path):
+    from pipeline.clone_synth import NeuralSynthesizer
+    studio = NeuralSynthesizer(voice="studio_narrator", speed=1.0)
+    try:
+        audio = studio.synth_chunk("Hello there, this is the studio narrator.")
+    finally:
+        studio.close()
+    assert isinstance(audio, np.ndarray) and audio.shape[0] > SAMPLE_RATE // 2
+    ref = str(tmp_path / "ref.wav")  # a few seconds of the studio voice as the reference
+    sf.write(ref, audio if len(audio) > 6 * SAMPLE_RATE else np.tile(audio, 4), SAMPLE_RATE)
+    clone = ClonedSynthesizer(ref, speed=1.1)
+    try:
+        cloned = clone.synth_chunk("And this is the same voice, cloned.")
+    finally:
+        clone.close()
+    assert cloned.shape[0] > SAMPLE_RATE // 2

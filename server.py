@@ -37,6 +37,7 @@ from backend.cache import ChunkCache
 from backend.licenses import load_components
 from backend.firstrun import first_run_checklist
 from pipeline.clone_synth import ClonedSynthesizer
+from pipeline.engines import DEFAULT_STUDIO_VOICE, STUDIO_VOICES
 from pipeline.normalize import normalize_text, BUILTIN_PRONUNCIATIONS
 from pipeline.ingest import build_book_text
 from pipeline.documents import document_to_sources
@@ -102,9 +103,19 @@ _VOICE_LABELS = {"af_heart": "Heart", "af_bella": "Bella", "af_nicole": "Nicole"
                  "bm_george": "George", "bm_lewis": "Lewis", "bm_daniel": "Daniel"}
 
 
+def studio_engine_available() -> bool:
+    """True when the neural engine (Chatterbox) is installed in this environment."""
+    return importlib.util.find_spec("chatterbox") is not None
+
+
+def default_voice() -> str:
+    """The studio narrator when its engine is installed, else Kokoro's af_heart."""
+    return DEFAULT_STUDIO_VOICE if studio_engine_available() else "af_heart"
+
+
 class RenderRequest(BaseModel):
     bookText: str = Field(min_length=1, max_length=MAX_BOOK_CHARS)
-    voice: str = "af_heart"
+    voice: str = Field(default_factory=lambda: default_voice())
     speed: float = Field(default=1.0, ge=0.5, le=1.5, allow_inf_nan=False)
     title: str = Field(default="", max_length=300)
     author: str = Field(default="", max_length=300)
@@ -113,14 +124,16 @@ class RenderRequest(BaseModel):
 
 
 def voices_payload() -> list[dict]:
-    out = []
+    out = [{"id": vid, "label": v["label"], "accent": v["accent"], "gender": v["gender"],
+            "kind": "studio", "engine": v["engine"]} for vid, v in STUDIO_VOICES.items()]
     for vid, lang in PRESET_VOICES.items():
         out.append({"id": vid, "label": _VOICE_LABELS.get(vid, vid),
                     "accent": _ACCENT.get(lang, lang),
-                    "gender": "Female" if vid[1] == "f" else "Male", "kind": "preset"})
+                    "gender": "Female" if vid[1] == "f" else "Male", "kind": "preset",
+                    "engine": "kokoro"})
     for v in voices.list():
         out.append({"id": v["id"], "label": v["name"], "name": v["name"],
-                    "accent": "Cloned", "gender": "", "kind": "cloned"})
+                    "accent": "Cloned", "gender": "", "kind": "cloned", "engine": "chatterbox"})
     return out
 
 
@@ -174,7 +187,9 @@ def health():
             "ffmpeg": bool(ffmpeg), "espeak": bool(espeak),
             "checklist": items, "ready": all(i["ok"] for i in items),
             "libraryWritable": os.access(LIBRARY_DIR, os.W_OK),
-            "voiceCloning": importlib.util.find_spec("f5_tts") is not None,
+            "voiceCloning": studio_engine_available(),
+            "studioVoices": studio_engine_available(),
+            "defaultVoice": default_voice(),
             "device": select_device(),
             "libraryPath": os.path.abspath(LIBRARY_DIR),
             "voicesWritable": os.access(VOICES_DIR, os.W_OK)}
@@ -511,14 +526,15 @@ class ConsentRequest(BaseModel):
 
 
 def _clone_consent_refusal(voice_id):
-    """403 for a stored-clone voice until the F5-TTS licence is acknowledged.
+    """403 for a stored-clone voice until the user confirms they may clone voices.
 
     Covers clones that were never created through the gate (for example a
     voices folder restored from a backup), not only POST /api/voices/clone."""
-    if voice_id in PRESET_VOICES or read_consent(CONSENT_PATH)["acknowledged"]:
+    if (voice_id in PRESET_VOICES or voice_id in STUDIO_VOICES
+            or read_consent(CONSENT_PATH)["acknowledged"]):
         return None
     return JSONResponse(status_code=403, content={
-        "detail": "clone licence not acknowledged", "error": "consent_required",
+        "detail": "voice-rights confirmation required", "error": "consent_required",
         "license": LICENSE, "attribution": ATTRIBUTION})
 
 
@@ -544,7 +560,7 @@ async def voices_clone(name: str = Form(...), audio: UploadFile = File(...),
                        refText: str = Form("")):
     if not read_consent(CONSENT_PATH)["acknowledged"]:
         return JSONResponse(status_code=403, content={
-            "detail": "clone licence not acknowledged", "error": "consent_required",
+            "detail": "voice-rights confirmation required", "error": "consent_required",
             "license": LICENSE, "attribution": ATTRIBUTION})
     if not name.strip() or len(name.strip()) > 200:
         raise HTTPException(status_code=400, detail="name is required")

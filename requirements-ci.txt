@@ -1,6 +1,6 @@
 # Minimal dependencies to run the GPU-free test suite in CI.
-# The TTS engines (kokoro, f5-tts) and torch are intentionally NOT installed here:
-# the unit tests mock them, and the GPU smoke tests are opt-in (RUN_KOKORO / RUN_F5).
+# The TTS engines (kokoro, chatterbox-tts) and torch are intentionally NOT installed here:
+# the unit tests mock them, and the GPU smoke tests are opt-in (RUN_KOKORO / RUN_CHATTERBOX).
 pytest>=8.0
 numpy>=1.24
 soundfile>=0.12

@@ -30,8 +30,8 @@ The GPU model tests are opt-in (and require the models installed):
 ```bash
 # Kokoro:
 RUN_KOKORO=1 pytest tests/test_synth.py
-# F5-TTS voice cloning:
-RUN_F5=1 pytest tests/test_clone_synth.py
+# Chatterbox studio voice and cloning (real worker; downloads ~3.2 GB once):
+RUN_CHATTERBOX=1 pytest tests/test_clone_synth.py
 ```
 
 Please keep the suite green and add tests for new behavior. The project follows

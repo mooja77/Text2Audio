@@ -12,11 +12,11 @@ const Voices = {
         </div>
         <textarea class="cinput" id="cv-text" aria-label="Transcript of the clip (optional)" rows="2" placeholder="(optional) type what's said in the clip — improves quality; leave blank to auto-detect"></textarea>
         <button class="btn" id="cv-add" style="margin-top:8px">Create voice</button>
-        <div class="muted" style="font-size:12px;margin-top:6px">Upload ~10–30s of clean speech. Cloned renders are higher quality but much slower.</div>
+        <div class="muted" style="font-size:12px;margin-top:6px">Upload 10–30 s of clean speech from one person. Cloned voices use the studio engine, which needs a graphics card to run at a usable speed.</div>
         <div id="cv-notice" role="note" style="font-size:13px;margin-top:10px">
-          <p style="margin:0 0 6px">Cloned voices can't be used in audiobooks you sell.</p>
-          <p style="margin:0 0 6px">Cloning uses F5-TTS weights from <a href="https://github.com/SWivid/F5-TTS" target="_blank" rel="noreferrer">SWivid/F5-TTS</a>, licensed <a href="https://creativecommons.org/licenses/by-nc/4.0/" target="_blank" rel="noreferrer">CC-BY-NC-4.0</a> (non-commercial).</p>
-          <label id="cv-ack-wrap"><input type="checkbox" id="cv-ack"> I understand and will use cloned voices non-commercially only.</label>
+          <p style="margin:0 0 6px">Only clone your own voice, a voice you have the speaker's permission to use, or a public-domain recording.</p>
+          <p style="margin:0 0 6px">Cloning uses <a href="https://github.com/resemble-ai/chatterbox" target="_blank" rel="noreferrer">Chatterbox</a> by Resemble AI (MIT licence), so you may sell audiobooks made with a voice you have the right to use. Its audio carries an inaudible watermark that marks it as AI-generated.</p>
+          <label id="cv-ack-wrap"><input type="checkbox" id="cv-ack"> I have the right to clone the voices I upload.</label>
         </div>
       </div>
       <div class="cards" id="vcards"></div>`;
@@ -41,7 +41,7 @@ const Voices = {
     cards.innerHTML = T2A.state.voices.map(v => `
       <div class="vcard ${v.id === T2A.state.voice ? "sel" : ""}" data-v="${T2A.esc(v.id)}">
         <div class="dot"></div>
-        <div class="vn">${T2A.esc(v.label)} ${v.kind === "cloned" ? '<span style="font-size:10px;color:var(--ac2)">● cloned</span>' : ""}</div>
+        <div class="vn">${T2A.esc(v.label)} ${v.kind === "cloned" ? '<span style="font-size:10px;color:var(--ac2)">● cloned</span>' : v.kind === "studio" ? '<span style="font-size:10px;color:var(--ac2)">● studio</span>' : ""}</div>
         <div class="vm">${T2A.esc(v.accent)}${v.gender ? " · " + T2A.esc(v.gender) : ""}</div>
         <div class="row">
           <button class="btn play" data-v="${T2A.esc(v.id)}" aria-label="Play sample of ${T2A.esc(v.label)}">▶ Sample</button>
@@ -71,7 +71,7 @@ const Voices = {
     fd.append("name", name); fd.append("audio", file); fd.append("refText", refText);
     const box = document.getElementById("cv-ack");
     if (!this.acked) {
-      if (!box || !box.checked) { T2A.toast("Confirm the voice-licence notice first"); return; }
+      if (!box || !box.checked) { T2A.toast("Confirm you have the right to clone this voice first"); return; }
       try {
         await T2A.api("/api/clone-consent", { method: "POST",
           headers: { "Content-Type": "application/json" }, body: JSON.stringify({ acknowledged: true }) });

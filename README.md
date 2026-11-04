@@ -12,8 +12,10 @@ Text2Audio is a local, open-source audiobook studio. Drop in your manuscript
 chapter markers — no cloud, no accounts, no per-use cost. It can even **clone a
 voice** from a short audio sample.
 
-It runs entirely offline on your own GPU using open text-to-speech models
-(Kokoro-82M by default; F5-TTS for voice cloning).
+It runs entirely offline on your own machine using open-source text-to-speech
+models: **Chatterbox** (Resemble AI, MIT) for the studio narrator voice and voice
+cloning, and **Kokoro-82M** (Apache-2.0) for fast voices on any PC. Both allow
+commercial use, so you may sell the audiobooks you make.
 
 ## Screenshots
 
@@ -61,13 +63,7 @@ pip install git+https://github.com/mooja77/Text2Audio
 text2audio
 ```
 
-Add the optional voice-cloning engine with the `clone` extra:
-
-```bash
-pip install "text2audio[clone] @ git+https://github.com/mooja77/Text2Audio"
-```
-
-You'll still need **ffmpeg** and **espeak-ng** installed on your system, and — for GPU
+This installs both engines (Chatterbox and Kokoro). You'll still need **ffmpeg** and **espeak-ng** installed on your system, and — for GPU
 speed — a CUDA build of PyTorch (`pip` pulls the CPU build by default). See
 [Setup](#setup) below for the details.
 
@@ -85,10 +81,14 @@ speed — a CUDA build of PyTorch (`pip` pulls the CPU build by default). See
   (no re-synthesis).
 - 🗣️ **Reads text correctly** — expands numbers/abbreviations and an editable
   **pronunciation dictionary** fixes tricky names.
-- 🎤 **Voice cloning** (optional) — upload ~10–30 s of speech and narrate in that
-  voice, via F5-TTS (runs isolated; Kokoro stays the fast default). **Non-commercial
-  only:** the F5-TTS weights are CC-BY-NC-4.0, so the app asks you to acknowledge
-  this once before you clone or narrate with a cloned voice, and marks those books.
+- 🎙️ **Studio narrator voice** — Chatterbox (Resemble AI, MIT), the best open-source
+  model in our November 2026 bake-off, is the default narrator on PCs with an NVIDIA
+  graphics card. Kokoro's 15 voices stay as the fast option for any PC.
+- 🎤 **Voice cloning** — upload ~10–30 s of speech and narrate in that voice, via
+  Chatterbox (runs in an isolated worker). The code and weights are MIT, so cloned
+  audiobooks can be sold. The app asks you once to confirm you have the right to
+  clone the voice. Chatterbox audio carries an inaudible watermark that marks it
+  as AI-generated.
 - 🔒 **100% local & free** — your text and audio never leave your machine. The
   server binds `127.0.0.1` only, and once the model is downloaded a render opens
   no network connections.
@@ -107,8 +107,15 @@ speed — a CUDA build of PyTorch (`pip` pulls the CPU build by default). See
 ## Requirements
 
 - Windows (developed/tested on Windows 11), Linux, or macOS. Text2Audio automatically
-  selects NVIDIA CUDA, Apple MPS, or CPU; CPU works but is slow. Set `T2A_DEVICE`
-  to `cuda`, `mps`, or `cpu` to override detection.
+  selects NVIDIA CUDA, Apple MPS, or CPU. Set `T2A_DEVICE` to `cuda`, `mps`, or
+  `cpu` to override detection.
+- **For the studio voice and cloning:** an NVIDIA graphics card with about 5 GB of
+  free memory (Chatterbox peaked at 4.5 GB in our tests), plus about 3.5 GB of disk
+  for the model. See the release notes for
+  the speed we measured; Chatterbox is far slower than Kokoro, and on a CPU it is
+  too slow for whole books.
+- **For the fast Kokoro voices:** any PC. Kokoro ran about 28 times faster than real
+  time on the test PC's RTX 3090 and about 3 times faster than real time on its CPU.
 - **Python 3.10–3.12**
 - **[ffmpeg](https://www.gyan.dev/ffmpeg/builds/)** on your `PATH` (provides
   `ffmpeg` and `ffprobe`).
@@ -149,7 +156,9 @@ The project is plain Python and cross-platform. The commands are the same, excep
 - Where this README shows `.\.venv\Scripts\python.exe`, use `.venv/bin/python`.
 - Pick the PyTorch index for your platform/accelerator from
   [pytorch.org](https://pytorch.org/get-started/locally/) (e.g. ROCm on Linux, or
-  the default CPU/MPS build on macOS — note Kokoro/F5 are much faster on CUDA).
+  the default CPU/MPS build on macOS — note Kokoro and Chatterbox are much faster on CUDA).
+  Chatterbox pins `torch==2.6.0` and `torchaudio==2.6.0`, so install those
+  versions from your index first.
 
 ## Run
 
@@ -189,9 +198,9 @@ is imported, so a render opens no network connections. On the very first run the
 model is not cached yet, so the app stays online to download it; the offline
 setting applies from the next start. Choosing a narrator voice you have not used
 before still works on a connected PC: that one voice file is downloaded once. If
-you set `HF_HUB_OFFLINE` yourself, Text2Audio leaves it alone. The cloning worker does the same once the
-F5-TTS and Vocos files are cached, and it is started with the offline
-settings passed explicitly. `tests/test_render.py` checks that a mocked
+you set `HF_HUB_OFFLINE` yourself, Text2Audio leaves it alone. The studio-voice
+worker does the same once the Chatterbox files (pinned to one verified revision)
+are cached, and it is started with the offline settings passed explicitly. `tests/test_render.py` checks that a mocked
 render never opens a socket.
 
 ### First-run checklist and error messages
@@ -218,23 +227,23 @@ Once upon a time...
 If there are no markers, it auto-detects `Chapter N` / ALL-CAPS headings, else
 treats the whole text as one chapter.
 
-## Voice cloning (optional)
+## Studio voice and voice cloning
 
-Voice cloning uses **F5-TTS**, a heavier optional engine. Kokoro stays the
-default; cloning runs in an isolated subprocess (F5 and Kokoro can't share a
-process).
+Both use **Chatterbox** (Resemble AI; MIT code and MIT weights), installed with the
+app. It runs in an isolated worker process, so the server stays light and Kokoro
+never shares a process with it. The first use downloads about 3.2 GB of weights,
+pinned to the revision whose licence was checked. After that it runs offline.
 
-```powershell
-.\.venv\Scripts\python.exe -m pip install f5-tts
-# f5-tts may pull a mismatched torchaudio — re-pin it to match your torch:
-.\.venv\Scripts\python.exe -m pip install "torchaudio==2.6.0" --index-url https://download.pytorch.org/whl/cu124
-```
+In **Voices → Clone a voice**, tick the box once to confirm you have the right to
+clone the voice. Then name the voice and upload 10–30 s of clean speech from one
+person (Chatterbox listens to the first 10 s). The cloned voice appears alongside the
+built-ins and in the Create dropdown. Use **▶ Sample** to audition first.
 
-Then in **Voices → Clone a voice**: read the licence notice and tick it once
-(cloned voices are non-commercial, CC-BY-NC-4.0), name the voice, upload ~10–30 s of clean speech, and
-(optionally) paste a transcript of the clip for best quality. The cloned voice
-appears alongside the built-ins and in the Create dropdown. Cloned renders are
-higher quality but much slower — use **▶ Sample** to audition first.
+Every Chatterbox recording carries Resemble AI's inaudible Perth watermark, which
+marks it as AI-generated. It does not limit what you can do with the audio.
+
+Books cloned with F5-TTS before 1.5.0 keep their "non-commercial" mark in the
+library. Re-render them with 1.5 to use Chatterbox instead.
 
 ### ⚠️ Responsible use
 
@@ -251,13 +260,13 @@ pytest -q
 ```
 
 GPU model tests are opt-in: `$env:RUN_KOKORO=1; pytest tests/test_synth.py` and
-`$env:RUN_F5=1; pytest tests/test_clone_synth.py`.
+`$env:RUN_CHATTERBOX=1; pytest tests/test_clone_synth.py`.
 
 ## How it works
 
 ```
 book (.txt/.md) → ingest (clean markdown) → normalize (numbers/abbr/pronunciation)
-   → chunk (sentence/paragraph) → synthesize (Kokoro or F5) → assemble (ffmpeg:
+   → chunk (sentence/paragraph) → synthesize (Kokoro, or Chatterbox in its worker) → assemble (ffmpeg:
    chapters + loudness master) → .m4b in your library/
 ```
 
@@ -271,12 +280,12 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). Issues and PRs welcome.
 ## License
 
 Text2Audio's code is **MIT** (see [LICENSE](LICENSE)). The TTS **models** it
-downloads have their own licenses — notably the F5-TTS cloning weights are
-**CC-BY-NC (non-commercial)**. See [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md)
+downloads have their own licences: Chatterbox is MIT and Kokoro is Apache-2.0,
+and both allow commercial use. See [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md)
 and the verified record with sources in [docs/LICENSES.md](docs/LICENSES.md).
 
 ## Acknowledgements
 
-- [Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M) — default narration
-- [F5-TTS](https://github.com/SWivid/F5-TTS) — voice cloning
+- [Chatterbox](https://github.com/resemble-ai/chatterbox) by Resemble AI — studio narrator voice and voice cloning
+- [Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M) — fast narrator voices
 - ffmpeg, espeak-ng, FastAPI, and the wider open-source ecosystem

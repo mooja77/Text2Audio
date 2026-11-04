@@ -12,10 +12,13 @@ connected PC. If the user set HF_HUB_OFFLINE themselves, it is respected.
 """
 import os
 
+from pipeline.engines import CHATTERBOX_FILES, CHATTERBOX_REPO
+
 KOKORO_REPO = "hexgrad/Kokoro-82M"
 # repo -> files that must be in a snapshot before we treat the repo as cached.
 REQUIRED_FILES = {
     KOKORO_REPO: ("config.json", "kokoro-v1_0.pth"),
+    CHATTERBOX_REPO: CHATTERBOX_FILES,
 }
 KOKORO_REPOS = (KOKORO_REPO,)
 OFFLINE_VARS = ("HF_HUB_OFFLINE", "TRANSFORMERS_OFFLINE", "HF_HUB_DISABLE_TELEMETRY")

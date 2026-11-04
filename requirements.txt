@@ -8,6 +8,7 @@ aiofiles>=23.0,<25
 num2words>=0.5.13,<1
 pypdf>=5,<7
 
-# Voice cloning is OPTIONAL and intentionally NOT installed here — it pulls a heavy
-# (multi-GB) GPU stack. Add it on demand with `pip install f5-tts` (see README /
-# INSTALL.md → "Adding voice cloning").
+# Studio narrator voice and voice cloning: Chatterbox (Resemble AI, MIT code and
+# weights). It pins torch/torchaudio 2.6.0; the installer installs the matching CUDA
+# build first. Its ~3 GB of weights download on first use, then run offline.
+chatterbox-tts==0.1.7

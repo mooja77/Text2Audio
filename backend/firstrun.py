@@ -9,8 +9,9 @@ GENERIC_ERROR = ("Something went wrong. Please try again. If it keeps happening,
 _FRIENDLY = [
     (r"no space left|disk full", "Your disk is full. Free up some space and try again."),
     (r"ffmpeg", "A required audio tool is missing. Check the setup checklist at the top of the page."),
-    (r"f5-tts|f5 worker|f5 synthesis",
-     "Voice cloning is not available. Choose a built-in narrator, or see INSTALL.md to add cloning."),
+    (r"chatterbox|voice engine worker",
+     "The studio voice engine is not available. Choose a Kokoro narrator, or run "
+     "Install Text2Audio.bat again to add it."),
     (r"timed out", "The voice engine took too long to respond. Try again, or try a shorter chapter."),
     (r"cancel", "The audiobook was cancelled."),
     (r"connection|urlopen|resolve|offline|max retries",

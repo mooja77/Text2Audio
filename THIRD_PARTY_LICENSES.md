@@ -6,28 +6,28 @@ runtime** from Hugging Face — they are not bundled in this repository. You are
 responsible for complying with each model's license for your use case.
 
 Every entry below was verified live against the upstream licence file or model
-card at a pinned revision on 2026-11-03. The full record, with quotes, pinned
+card at a pinned revision on 2026-11-03 or 2026-11-04. The full record, with quotes, pinned
 links and verdicts, is in [`docs/LICENSES.md`](docs/LICENSES.md).
 
 ## Text-to-speech models
 
 | Component | Used for | License | Notes |
 |---|---|---|---|
-| **Kokoro-82M** (`hexgrad/Kokoro-82M`) weights and voices | Default narration (preset voices) | **Apache-2.0** | Permissive; commercial use OK. |
-| **kokoro**, **misaki** (Python packages) | Default narration, text-to-phoneme | Apache-2.0 | |
-| **F5-TTS** (`SWivid/F5-TTS`) — code | Voice cloning engine (optional) | **MIT** | Permissive. |
-| **F5-TTS** — model weights (`F5TTS_v1_Base`) | Voice cloning (optional) | **CC-BY-NC-4.0** | **Non-commercial.** Upstream: "The pre-trained models are licensed under the CC-BY-NC license due to the training data Emilia". Audio made with a cloned voice must not be used commercially. |
-| **Vocos** (`charactr/vocos-mel-24khz`, `gemelo-ai/vocos`) | F5-TTS vocoder | MIT | |
+| **Chatterbox** (`ResembleAI/chatterbox`, pinned revision `5bb1f6e`) weights | Studio narrator voice and voice cloning (default) | **MIT** | Permissive; commercial use OK. |
+| **chatterbox-tts** 0.1.7 (Python package) | Studio narrator voice and voice cloning | **MIT** | |
+| **resemble-perth** 1.0.1 | Inaudible watermark on Chatterbox audio | MIT | Marks audio as AI-generated; does not restrict use. |
+| **s3tokenizer** 0.3.0 | Chatterbox speech tokenizer | Apache-2.0 | |
+| **Kokoro-82M** (`hexgrad/Kokoro-82M`) weights and voices | Fast narrator voices (any PC) | **Apache-2.0** | Permissive; commercial use OK. |
+| **kokoro**, **misaki** (Python packages) | Fast narrator voices, text-to-phoneme | Apache-2.0 | |
 
-> **In-app gate:** the clone panel names CC-BY-NC-4.0 and SWivid/F5-TTS, the
-> server refuses to create a cloned voice until the user has acknowledged the
-> notice once, and books rendered with a cloned voice carry
-> "non-commercial (F5-TTS CC-BY-NC-4.0)" in their manifest.
+> **Selling audiobooks:** both engines are open source and allow commercial use.
+> Audiobooks made with the studio voice, a Kokoro voice, or a clone of a voice
+> you have the right to use may be sold. The clone panel asks once that you
+> confirm you have that right.
 >
-> **Commercial use of voice cloning:** the default F5-TTS weights are CC-BY-NC
-> (non-commercial). For commercial cloning you would need permissively-licensed
-> weights — none is wired in by default. Narration with the built-in Kokoro
-> voices has no such restriction.
+> **Removed in 1.5.0:** F5-TTS (weights CC-BY-NC-4.0) and its Vocos vocoder.
+> Books cloned with F5 before 1.5.0 keep their "non-commercial (F5-TTS
+> CC-BY-NC-4.0)" mark; re-render them to use Chatterbox.
 
 ## Copyleft components installed on your machine (not redistributed by Text2Audio)
 
@@ -42,6 +42,8 @@ including the GPL text and source.
   (`kokoro` → `misaki[en]` → `espeakng-loader`) also pip-installs a bundled
   `espeak-ng.dll` (GPL-3.0).
 - **phonemizer-fork** — espeak-ng wrapper pulled in by `misaki[en]` (GPL-3.0-or-later).
+- **pykakasi** — Japanese text library pulled in by `chatterbox-tts` for its
+  multilingual model, which Text2Audio does not use (GPL-3.0-or-later).
 - **ffmpeg / ffprobe** — audio encoding and analysis. The installer uses the
   gyan.dev build via winget, which is GPLv3. Text2Audio runs it as a separate
   program; your audio output is not covered by the GPL.
@@ -53,16 +55,19 @@ including the GPL text and source.
 `fastapi` (MIT), `uvicorn` (BSD-3-Clause), `soundfile` (BSD-3-Clause), `numpy`
 (BSD-3-Clause and others), `python-multipart` (Apache-2.0), `aiofiles`
 (Apache-2.0), `pypdf` (BSD-3-Clause), `spacy` and `en_core_web_sm` (MIT),
-`transformers` (Apache-2.0), `torch` and `torchaudio` (BSD/Apache), and the
-optional `gradio` (Apache-2.0).
+`transformers` (Apache-2.0), `torch` and `torchaudio` (BSD/Apache), `gradio`
+(Apache-2.0), and Chatterbox's `diffusers` (Apache-2.0), `safetensors` (Apache-2.0),
+`conformer` (MIT), `librosa` (ISC), `pyloudnorm` (MIT), `omegaconf` (BSD) and
+`spacy-pkuseg` (MIT).
 
 ## Credits
 
 - Kokoro-82M by hexgrad — <https://huggingface.co/hexgrad/Kokoro-82M> — Apache License 2.0.
 - misaki by hexgrad — <https://github.com/hexgrad/misaki> — Apache License 2.0.
-- F5-TTS by Yushen Chen et al. (SWivid) — code MIT <https://github.com/SWivid/F5-TTS>;
-  weights CC BY-NC 4.0 <https://creativecommons.org/licenses/by-nc/4.0/>.
-- Vocos by Charactr Inc. — <https://github.com/gemelo-ai/vocos> — MIT.
+- Chatterbox by Resemble AI — <https://github.com/resemble-ai/chatterbox> and
+  <https://huggingface.co/ResembleAI/chatterbox> — MIT.
+- Perth watermarker by Resemble AI — <https://github.com/resemble-ai/perth> — MIT.
+- S3Tokenizer by Xingchen Song — <https://github.com/xingchensong/S3Tokenizer> — Apache License 2.0.
 - eSpeak NG — <https://github.com/espeak-ng/espeak-ng> — GPL-3.0-or-later.
 
 ## Responsible voice cloning

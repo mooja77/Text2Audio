@@ -6,6 +6,49 @@ All notable changes to Text2Audio are recorded here. The format follows
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-11-04
+
+New voice engine. The studio narrator and voice cloning now use Chatterbox
+(Resemble AI; MIT code and weights), chosen by a measured bake-off of the
+current open-source models. Cloned audiobooks may now be sold.
+
+### Added
+
+- **Studio Narrator** voice (Chatterbox's built-in voice), the default on PCs
+  with an NVIDIA graphics card. Kokoro's 15 voices stay as the fast option and
+  remain the default without one.
+- `pipeline/engines/` and `pipeline/engine_worker.py`: an isolated worker
+  process for neural engines, with Chatterbox's weights pinned to revision
+  `5bb1f6e`.
+- `GET /api/health` reports `studioVoices` and `defaultVoice`; `GET /api/voices`
+  lists the studio voice first and gives every voice an `engine`.
+- Manifests record which `engine` narrated the book.
+- `docs/LICENSES.md` section 2: the November 2026 model shortlist, with each
+  model's weights and code licence read at a pinned revision.
+
+### Changed
+
+- **Voice cloning uses Chatterbox instead of F5-TTS.** The clone panel now asks
+  you once to confirm you have the right to clone the voice, instead of asking
+  you to accept a non-commercial licence. The 1.4 acknowledgement no longer
+  counts.
+- Cloned voices accept a speed setting (ffmpeg `atempo`, pitch kept).
+- `chatterbox-tts==0.1.7` is a core dependency (pins torch/torchaudio 2.6.0,
+  transformers 5.2.0, numpy < 2). The Windows installer installs the CUDA 12.4
+  build of torch 2.6.0 first.
+- A failed chunk on the neural engine is retried once before the render stops.
+
+### Removed
+
+- F5-TTS and its Vocos vocoder (weights CC-BY-NC-4.0), `pipeline/f5_worker.py`,
+  and the non-commercial mark on new books. Books cloned with F5 before 1.5.0
+  keep their mark until you render them again.
+
+### Fixed
+
+- The chunk cache can no longer serve audio made by an older engine for the same
+  cloned voice: neural cache keys now include the engine.
+
 ## [1.4.0] - 2026-11-03
 
 Licence gating, a real offline guarantee, accessibility and plain-language help.

@@ -22,3 +22,11 @@ def test_checklist_flags_failures_with_actions(tmp_path):
 def test_checklist_all_ok(tmp_path):
     items = first_run_checklist(True, True, True, str(tmp_path))
     assert all(i["action"] == "" for i in items if i["ok"])
+
+
+def test_engine_errors_are_plain_language():
+    from backend.firstrun import friendly_error
+    assert "studio voice engine" in friendly_error(
+        "install chatterbox-tts to use the studio voice and cloned voices")
+    assert "studio voice engine" in friendly_error("voice engine worker exited unexpectedly")
+    assert "took too long" in friendly_error("voice engine synthesis timed out")
