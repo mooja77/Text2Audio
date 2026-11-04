@@ -173,12 +173,38 @@ def language_ready():
         return False
 
 
-def models_ready(root=None, env=None, gpu_usable=False):
-    '''Full offline readiness: Kokoro files + language model; Chatterbox only if wanted.'''
+def runtime_needs_chatterbox(env=None, gpu_usable=False, device=None):
+    '''Runtime (not download) selection: only a usable GPU that is not forced to CPU.'''
+    env = os.environ if env is None else env
+    selected = (device or env.get('T2A_DEVICE') or '').strip().lower()
+    return bool(gpu_usable) and selected != 'cpu'
+
+
+def models_ready(root=None, env=None, gpu_usable=False, device=None):
+    '''Full offline readiness for the selected RUNTIME: Kokoro files + language model;
+    Chatterbox only when the runtime is a usable GPU. T2A_DOWNLOAD_CHATTERBOX only
+    selects what install() downloads and never changes CPU readiness.'''
     env = os.environ if env is None else env
     root = root or hub_cache(env)
-    need = [KOKORO_REPO] + ([CHATTERBOX_REPO] if want_chatterbox(env, gpu_usable) else [])
+    need = [KOKORO_REPO] + ([CHATTERBOX_REPO] if runtime_needs_chatterbox(env, gpu_usable, device) else [])
     return language_ready() and all(repo_ready(root, r) for r in need)
+
+
+class ModelUnavailable(RuntimeError):
+    pass
+
+
+def require_files(repo, rels, root=None):
+    '''Exact size + streamed digest for the named pinned files; returns the snapshot dir.'''
+    root = root or hub_cache()
+    specs = {s.rel: s for s in MANIFEST[repo][1]}
+    bad = [r for r in rels if r not in specs or not is_valid(local_path(root, repo, r), specs[r])]
+    if bad:
+        raise ModelUnavailable(
+            'Required voice model files are missing, incomplete or damaged: %s. Connect to the '
+            'internet and run Install Text2Audio.bat (or "python -m backend.model_download") to '
+            'download or repair them, then try again.' % ', '.join(bad))
+    return snapshot_dir(root, repo)
 
 
 def write_checkpoint(root, verified):

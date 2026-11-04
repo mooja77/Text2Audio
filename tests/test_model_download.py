@@ -9,6 +9,7 @@ import types
 import pytest
 
 from backend import model_download as md
+from backend import offline as off
 from pipeline.engines import CHATTERBOX_FILES
 
 DATA = {'config.json': b'{"a": 1}', 'm.bin': bytes(range(256)) * 12}
@@ -218,7 +219,8 @@ def test_readiness_is_conditional_and_separate_from_files(env, monkeypatch):
     monkeypatch.setattr(md, 'language_ready', lambda: True)
     assert md.models_ready(root, env={}, gpu_usable=False)  # CPU: Chatterbox not required
     assert not md.models_ready(root, env={}, gpu_usable=True)
-    assert not md.models_ready(root, env={'T2A_DOWNLOAD_CHATTERBOX': '1'})
+    # Prefetch selects what install() downloads; it never changes CPU runtime readiness.
+    assert md.models_ready(root, env={'T2A_DOWNLOAD_CHATTERBOX': '1'})
     run(root, Server({**DATA, **CB}), include_chatterbox=True)
     assert md.models_ready(root, env={}, gpu_usable=True)
 
@@ -254,3 +256,130 @@ def test_runtime_bridge_uses_pinned_local_paths(tmp_path):
     assert paths['voice']('af_heart') == os.path.join(snap, 'voices', 'af_heart.pt')
     assert md.chatterbox_dir(str(tmp_path)).endswith(os.path.join('snapshots', md.CHATTERBOX_REVISION_FOR_TEST)) \
         if hasattr(md, 'CHATTERBOX_REVISION_FOR_TEST') else md.chatterbox_dir(str(tmp_path)).endswith(md.CHATTERBOX_REVISION)
+
+
+# ---- startup / runtime-readiness / verification regressions ----------------
+@pytest.fixture()
+def ready(env, monkeypatch):
+    root, _ = env
+    run(root, Server(DATA))
+    monkeypatch.setattr(md, 'language_ready', lambda: True)
+    off._VERIFIED.clear()
+    return root
+
+
+def _write(root, rel, data, snap='snapshots/' + md.KOKORO_REV):
+    p = os.path.join(root, 'models--hexgrad--Kokoro-82M', *snap.split('/'), *rel.split('/'))
+    os.makedirs(os.path.dirname(p), exist_ok=True)
+    with open(p, 'wb') as f:
+        f.write(data)
+
+
+def test_startup_goes_offline_only_for_pinned_complete_cache(ready):
+    e = {'HF_HUB_CACHE': ready, 'T2A_DOWNLOAD_CHATTERBOX': '1'}  # Chatterbox absent: irrelevant
+    assert off.configure_at_startup(e) == {n: '1' for n in off.OFFLINE_VARS}
+    assert e['HF_HUB_OFFLINE'] == '1' and e['TRANSFORMERS_OFFLINE'] == '1'
+
+
+def test_one_byte_config_and_weights_do_not_force_offline(env, monkeypatch):
+    root, k = env
+    monkeypatch.setattr(md, 'language_ready', lambda: True)
+    for s in k:
+        _write(root, s.rel, b'x')
+    e = {'HF_HUB_CACHE': root}
+    assert off.configure_at_startup(e) == {} and 'HF_HUB_OFFLINE' not in e
+
+
+def test_arbitrary_snapshot_does_not_force_offline(env, monkeypatch):
+    root, _ = env
+    monkeypatch.setattr(md, 'language_ready', lambda: True)
+    for rel, data in DATA.items():
+        _write(root, rel, data, 'snapshots/abc')
+    e = {'HF_HUB_CACHE': root}
+    assert off.configure_at_startup(e) == {} and 'HF_HUB_OFFLINE' not in e
+
+
+def test_missing_language_model_does_not_force_offline(ready, monkeypatch):
+    monkeypatch.setattr(md, 'language_ready', lambda: False)
+    e = {'HF_HUB_CACHE': ready}
+    assert off.configure_at_startup(e) == {} and 'HF_HUB_OFFLINE' not in e
+
+
+def test_missing_voice_does_not_force_offline(env, monkeypatch):
+    root, k = env
+    voice = spec('voices/af_heart.pt', b'v')
+    monkeypatch.setattr(md, 'MANIFEST', {**md.MANIFEST, md.KOKORO_REPO: (md.KOKORO_REV, k + (voice,))})
+    monkeypatch.setattr(md, 'language_ready', lambda: True)
+    run(root, Server({**DATA, 'voices/af_heart.pt': b'v'}))
+    off._VERIFIED.clear()
+    e = {'HF_HUB_CACHE': root}
+    assert off.voice_cached('af_heart', e)
+    os.remove(md.local_path(root, md.KOKORO_REPO, 'voices/af_heart.pt'))
+    off._VERIFIED.clear()
+    assert not off.voice_cached('af_heart', e)
+    assert off.configure_at_startup(e) == {} and not md.models_ready(root, env={})
+
+
+def test_same_size_corruption_does_not_force_offline(ready):
+    e = {'HF_HUB_CACHE': ready}
+    final = md.local_path(ready, md.KOKORO_REPO, 'm.bin')
+    bad = bytearray(DATA['m.bin'])
+    bad[0] ^= 1
+    with open(final, 'wb') as f:
+        f.write(bad)
+    off._VERIFIED.clear()
+    assert off.configure_at_startup(e) == {} and 'HF_HUB_OFFLINE' not in e
+
+
+def test_user_offline_flags_are_respected(ready):
+    e = {'HF_HUB_CACHE': ready, 'HF_HUB_OFFLINE': '0'}
+    assert off.configure_at_startup(e) == {} and e['HF_HUB_OFFLINE'] == '0'
+    e2 = {'HF_HUB_CACHE': ready, 'TRANSFORMERS_OFFLINE': '1'}
+    assert off.configure_at_startup(e2) == {} and 'HF_HUB_OFFLINE' not in e2
+
+
+def test_unknown_engine_repos_never_force_offline(ready):
+    e = {'HF_HUB_CACHE': ready}
+    assert off.configure_at_startup(e, repos=()) == {}
+    assert off.configure_at_startup(e, repos=('some/unpinned',)) == {}
+
+
+def test_prefetch_downloads_chatterbox_but_cpu_runtime_does_not_need_it(env, monkeypatch):
+    root, _ = env
+    monkeypatch.setattr(md, 'language_ready', lambda: True)
+    pre = {'T2A_DOWNLOAD_CHATTERBOX': '1'}
+    run(root, Server(DATA))
+    assert md.models_ready(root, env=pre, gpu_usable=False)
+    assert not md.models_ready(root, env=pre, gpu_usable=True)  # a GPU runtime does want it
+    assert md.models_ready(root, env={**pre, 'T2A_DEVICE': 'cpu'}, gpu_usable=True)
+    assert md.models_ready(root, env={}, gpu_usable=True, device='cpu')
+    srv = Server({**DATA, **CB})
+    rep = md.install(env=pre, root=root, opener=srv, sleep=NOSLEEP, disk_usage=BIG)
+    assert md.CHATTERBOX_REPO in rep['repos'] and rep['downloaded'] == ['c.bin']
+    assert srv.names() == ['c.bin']  # Kokoro files were reused, Chatterbox verified
+    assert md.models_ready(root, env={}, gpu_usable=True)
+
+
+def test_require_files_checks_size_and_digest_with_guidance(ready):
+    assert md.require_files(md.KOKORO_REPO, ['m.bin'], ready) == md.snapshot_dir(ready, md.KOKORO_REPO)
+    final = md.local_path(ready, md.KOKORO_REPO, 'm.bin')
+    bad = bytearray(DATA['m.bin'])
+    bad[5] ^= 1
+    with open(final, 'wb') as f:
+        f.write(bad)
+    with pytest.raises(md.ModelUnavailable, match='m.bin') as exc:
+        md.require_files(md.KOKORO_REPO, ['m.bin'], ready)
+    assert 'model_download' in str(exc.value)
+    os.remove(final)
+    with pytest.raises(md.ModelUnavailable):
+        md.require_files(md.KOKORO_REPO, ['m.bin', 'nope.bin'], ready)
+
+
+def test_offline_module_is_import_light():
+    import subprocess
+    import sys
+    code = ("import sys; import backend.offline; "
+            "bad=[m for m in ('huggingface_hub','transformers','torch','kokoro') if m in sys.modules]; "
+            "assert not bad, bad")
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    subprocess.run([sys.executable, '-c', code], cwd=root, check=True)

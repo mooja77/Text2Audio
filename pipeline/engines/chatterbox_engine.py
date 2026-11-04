@@ -9,13 +9,7 @@ from pathlib import Path
 
 import numpy as np
 
-from pipeline.engines import (CHATTERBOX_FILES, CHATTERBOX_REPO, CHATTERBOX_REVISION,
-                              STUDIO_VOICES)
-
-
-def _hf_hub_download():
-    from huggingface_hub import hf_hub_download
-    return hf_hub_download
+from pipeline.engines import CHATTERBOX_FILES, CHATTERBOX_REPO, STUDIO_VOICES
 
 
 def _chatterbox_tts():
@@ -56,25 +50,11 @@ class ChatterboxEngine:
         return np.asarray(wav, dtype=np.float32).reshape(-1), int(self.model.sr)
 
 
-def _pinned_dir():
-    """Pinned snapshot dir written by backend.model_download, if every file has its exact size."""
-    from backend import model_download as md
-    root = md.chatterbox_dir()
-    try:
-        for s in md.MANIFEST[CHATTERBOX_REPO][1]:
-            if os.path.getsize(os.path.join(root, *s.rel.split('/'))) != s.size:
-                return None
-    except OSError:
-        return None
-    return root
-
-
 def load(device: str) -> ChatterboxEngine:
-    pinned = _pinned_dir()
-    if pinned:  # same cache as the installer: local path, no Hub lookup
-        return ChatterboxEngine(_chatterbox_tts().from_local(Path(pinned), device))
-    download = _hf_hub_download()
-    path = None
-    for name in CHATTERBOX_FILES:
-        path = download(repo_id=CHATTERBOX_REPO, filename=name, revision=CHATTERBOX_REVISION)
-    return ChatterboxEngine(_chatterbox_tts().from_local(Path(path).parent, device))
+    """Verify the pinned files (exact size + streamed digest), then load from that directory.
+
+    No Hub lookup ever happens here; missing or damaged files raise
+    md.ModelUnavailable with install/repair guidance before the model is built."""
+    from backend import model_download as md
+    pinned = md.require_files(CHATTERBOX_REPO, list(CHATTERBOX_FILES))
+    return ChatterboxEngine(_chatterbox_tts().from_local(Path(pinned), device))

@@ -2,6 +2,32 @@ import os
 import pytest
 import numpy as np
 from backend.library import Library
+from backend import model_download as md
+from backend import offline as off
+from pipeline.engines import CHATTERBOX_FILES as _CBF, CHATTERBOX_REVISION as _CBREV
+
+
+def _mk_specs(data):
+    import hashlib
+    return tuple(md.Spec(r, len(b), hashlib.sha256(b).hexdigest()) for r, b in data.items())
+
+
+_KOKORO_DATA = {"config.json": b'{"a": 1}', "kokoro-v1_0.pth": b"weights",
+                "voices/af_heart.pt": b"v1", "voices/am_adam.pt": b"v2"}
+_CB_DATA = {n: b"cb:" + n.encode() for n in _CBF}
+
+
+@pytest.fixture(autouse=True)
+def _hermetic_pinned_models(tmp_path, monkeypatch):
+    """Tiny pinned manifest + tmp HF cache: never sees the host cache or the network."""
+    monkeypatch.setenv("HF_HOME", str(tmp_path / "hf"))
+    monkeypatch.setenv("HF_HUB_CACHE", str(tmp_path / "hf" / "hub"))
+    monkeypatch.delenv("HF_HUB_OFFLINE", raising=False)
+    monkeypatch.delenv("TRANSFORMERS_OFFLINE", raising=False)
+    monkeypatch.setattr(md, "MANIFEST", {md.KOKORO_REPO: (md.KOKORO_REV, _mk_specs(_KOKORO_DATA)),
+                                         md.CHATTERBOX_REPO: (_CBREV, _mk_specs(_CB_DATA))})
+    monkeypatch.setattr(md, "language_ready", lambda: True)
+    off._VERIFIED.clear()
 from backend.render import render_audiobook, remaster, purge_wavs
 from pipeline.synth import SAMPLE_RATE
 
@@ -216,11 +242,7 @@ def test_socket_guard_trips_on_connect(monkeypatch):
 def test_cached_render_sets_offline_and_opens_no_sockets(tmp_path, monkeypatch):
     from backend.offline import configure_at_startup
     hub = tmp_path / "hub"
-    snap = hub / "models--hexgrad--Kokoro-82M" / "snapshots" / "abc"
-    snap.mkdir(parents=True)
-    for name in ("config.json", "kokoro-v1_0.pth"):
-        (snap / name).write_bytes(b"x")
-    env = {"HF_HUB_CACHE": str(hub)}
+    env = _kokoro_cache(tmp_path)
     configure_at_startup(env)
     assert env["HF_HUB_OFFLINE"] == "1" and env["TRANSFORMERS_OFFLINE"] == "1"
 
@@ -234,13 +256,13 @@ def test_cached_render_sets_offline_and_opens_no_sockets(tmp_path, monkeypatch):
     assert attempts == []
 
 
-def _kokoro_cache(tmp_path, files=("config.json", "kokoro-v1_0.pth"), voices=()):
-    snap = tmp_path / "hub" / "models--hexgrad--Kokoro-82M" / "snapshots" / "abc"
+def _kokoro_cache(tmp_path, files=("config.json", "kokoro-v1_0.pth"), voices=("af_heart", "am_adam")):
+    snap = tmp_path / "hub" / "models--hexgrad--Kokoro-82M" / "snapshots" / md.KOKORO_REV
     (snap / "voices").mkdir(parents=True)
     for name in files:
-        (snap / name).write_bytes(b"x")
+        (snap / name).write_bytes(_KOKORO_DATA[name])
     for v in voices:
-        (snap / "voices" / f"{v}.pt").write_bytes(b"x")
+        (snap / "voices" / f"{v}.pt").write_bytes(_KOKORO_DATA[f"voices/{v}.pt"])
     return {"HF_HUB_CACHE": str(tmp_path / "hub")}
 
 
@@ -268,12 +290,12 @@ def test_new_voice_is_fetched_once_when_we_forced_offline(tmp_path, monkeypatch)
     monkeypatch.setattr(off, "_forced", True)
     seen = []
 
-    def fake_download(repo_id, filename):
-        seen.append((repo_id, filename, constants.HF_HUB_OFFLINE))
+    def fake_download(repo_id, filename, revision):
+        seen.append((repo_id, filename, revision, constants.HF_HUB_OFFLINE))
 
     assert off.ensure_voice_available("af_heart", download=fake_download, hub_constants=constants) is False  # cached
     assert off.ensure_voice_available("am_adam", download=fake_download, hub_constants=constants) is True
-    assert seen == [("hexgrad/Kokoro-82M", "voices/am_adam.pt", False)]  # online only during the call
+    assert seen == [("hexgrad/Kokoro-82M", "voices/am_adam.pt", md.KOKORO_REV, False)]  # online only during the call
     assert constants.HF_HUB_OFFLINE is True  # restored afterwards
 
 
@@ -360,9 +382,9 @@ def test_chatterbox_weights_count_as_cached_only_when_complete(tmp_path):
     snap.mkdir(parents=True)
     env = {"HF_HUB_CACHE": str(tmp_path / "hub")}
     for name in CHATTERBOX_FILES[:-1]:
-        (snap / name).write_bytes(b"x")
+        (snap / name).write_bytes(_CB_DATA[name])
     assert models_cached(env, repos=(CHATTERBOX_REPO,)) is False  # interrupted download
-    (snap / CHATTERBOX_FILES[-1]).write_bytes(b"x")
+    (snap / CHATTERBOX_FILES[-1]).write_bytes(_CB_DATA[CHATTERBOX_FILES[-1]])
     assert models_cached(env, repos=(CHATTERBOX_REPO,)) is True
 
 

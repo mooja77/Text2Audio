@@ -101,21 +101,16 @@ class Synthesizer(BaseSynthesizer):
                  device: str | None = None, speed: float = 1.0):
         if device is None:
             device = select_device()
-        from kokoro import KModel, KPipeline
-        from backend.offline import ensure_voice_available
         from backend import model_download as md
+        # Exact size + streamed digest of config, weights and the selected voice BEFORE
+        # any model construction; raises md.ModelUnavailable with install/repair guidance.
+        md.require_files(md.KOKORO_REPO, ["config.json", "kokoro-v1_0.pth", f"voices/{voice}.pt"])
+        from kokoro import KModel, KPipeline
         paths = md.kokoro_paths()
-        if os.path.exists(paths["config"]) and os.path.exists(paths["model"]):
-            # Pinned installer cache: load by local path, no Hub lookups.
-            kmodel = KModel(config=paths["config"], model=paths["model"],
-                            repo_id=paths["repo_id"]).to(device).eval()
-            self.pipeline = KPipeline(lang_code=lang_code, model=kmodel, device=device)
-            voice_file = paths["voice"](voice)
-            if os.path.exists(voice_file):
-                voice = voice_file
-        else:
-            self.pipeline = KPipeline(lang_code=lang_code, device=device)
-            ensure_voice_available(voice)  # first use of a narrator while offline mode is forced
+        kmodel = KModel(config=paths["config"], model=paths["model"],
+                        repo_id=paths["repo_id"]).to(device).eval()
+        self.pipeline = KPipeline(lang_code=lang_code, model=kmodel, device=device)
+        voice = paths["voice"](voice)
         self.voice = voice
         self.speed = speed
 
