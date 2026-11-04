@@ -24,13 +24,33 @@ BUILTIN_PRONUNCIATIONS = {
     "danaher": "Dan a her",
 }
 
-_NUM_RE = re.compile(r"(?<![\$\d.:])\b(\d+)(st|nd|rd|th)?\b(?![\d:%])(?!\.\d)", re.IGNORECASE)
+_NUMBER = r"(?:\d{1,3}(?:,\d{3})+|\d+)"
+_MONEY_RE = re.compile(r"([£$€])(" + _NUMBER + r"(?:\.\d{1,2})?)(?![\w]|\.\d)")
+_CURRENCIES = {
+    "£": (("pound", "pounds"), ("penny", "pence")),
+    "$": (("dollar", "dollars"), ("cent", "cents")),
+    "€": (("euro", "euro"), ("cent", "cents")),
+}
+_NUM_RE = re.compile(r"(?<![\$\d.:,])\b(" + _NUMBER + r")(st|nd|rd|th)?\b(?![\d:%]|,\d)(?!\.\d)", re.IGNORECASE)
+
+
+def _expand_money(match: re.Match) -> str:
+    whole, _, fraction = match.group(2).replace(",", "").partition(".")
+    # Parse the minor units exactly; a single decimal digit means tenths.
+    major, minor = int(whole), int(fraction.ljust(2, "0"))
+    major_names, minor_names = _CURRENCIES[match.group(1)]
+    parts = []
+    if major or not minor:
+        parts.append(f"{num2words(major)} {major_names[0 if major == 1 else 1]}")
+    if minor:
+        parts.append(f"{num2words(minor)} {minor_names[0 if minor == 1 else 1]}")
+    return " and ".join(parts)
 
 
 def expand_numbers(text: str) -> str:
     def repl(m):
         digits, ordinal = m.group(1), m.group(2)
-        n = int(digits)
+        n = int(digits.replace(",", ""))
         try:
             if ordinal:
                 return num2words(n, to="ordinal")
@@ -65,6 +85,8 @@ def apply_pronunciations(text: str, rules: dict) -> str:
 def normalize_text(text: str, custom_rules: dict | None = None) -> str:
     merged = {**BUILTIN_PRONUNCIATIONS,
               **{k.lower(): v for k, v in (custom_rules or {}).items()}}
+    # Convert complete amounts before the general number/year expansion.
+    text = _MONEY_RE.sub(_expand_money, text)
     text = expand_numbers(text)
     text = expand_abbreviations(text)
     text = apply_pronunciations(text, merged)
