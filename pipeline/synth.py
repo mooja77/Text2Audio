@@ -101,10 +101,21 @@ class Synthesizer(BaseSynthesizer):
                  device: str | None = None, speed: float = 1.0):
         if device is None:
             device = select_device()
-        from kokoro import KPipeline
+        from kokoro import KModel, KPipeline
         from backend.offline import ensure_voice_available
-        self.pipeline = KPipeline(lang_code=lang_code, device=device)
-        ensure_voice_available(voice)  # first use of a narrator while offline mode is forced
+        from backend import model_download as md
+        paths = md.kokoro_paths()
+        if os.path.exists(paths["config"]) and os.path.exists(paths["model"]):
+            # Pinned installer cache: load by local path, no Hub lookups.
+            kmodel = KModel(config=paths["config"], model=paths["model"],
+                            repo_id=paths["repo_id"]).to(device).eval()
+            self.pipeline = KPipeline(lang_code=lang_code, model=kmodel, device=device)
+            voice_file = paths["voice"](voice)
+            if os.path.exists(voice_file):
+                voice = voice_file
+        else:
+            self.pipeline = KPipeline(lang_code=lang_code, device=device)
+            ensure_voice_available(voice)  # first use of a narrator while offline mode is forced
         self.voice = voice
         self.speed = speed
 

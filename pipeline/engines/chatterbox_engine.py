@@ -4,6 +4,7 @@ Code: chatterbox-tts (MIT). Weights: ResembleAI/chatterbox, MIT, pinned to
 CHATTERBOX_REVISION. Every waveform Chatterbox returns carries Resemble AI's
 imperceptible Perth watermark (resemble-perth, MIT), which marks it as AI-generated.
 """
+import os
 from pathlib import Path
 
 import numpy as np
@@ -55,7 +56,23 @@ class ChatterboxEngine:
         return np.asarray(wav, dtype=np.float32).reshape(-1), int(self.model.sr)
 
 
+def _pinned_dir():
+    """Pinned snapshot dir written by backend.model_download, if every file has its exact size."""
+    from backend import model_download as md
+    root = md.chatterbox_dir()
+    try:
+        for s in md.MANIFEST[CHATTERBOX_REPO][1]:
+            if os.path.getsize(os.path.join(root, *s.rel.split('/'))) != s.size:
+                return None
+    except OSError:
+        return None
+    return root
+
+
 def load(device: str) -> ChatterboxEngine:
+    pinned = _pinned_dir()
+    if pinned:  # same cache as the installer: local path, no Hub lookup
+        return ChatterboxEngine(_chatterbox_tts().from_local(Path(pinned), device))
     download = _hf_hub_download()
     path = None
     for name in CHATTERBOX_FILES:
