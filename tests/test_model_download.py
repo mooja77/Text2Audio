@@ -375,6 +375,23 @@ def test_require_files_checks_size_and_digest_with_guidance(ready):
         md.require_files(md.KOKORO_REPO, ['m.bin', 'nope.bin'], ready)
 
 
+def test_same_size_corruption_with_restored_mtime_fails_readiness_without_cache_clear(ready):
+    e = {'HF_HUB_CACHE': ready}
+    assert off.models_cached(e) is True  # valid files: digest verified
+    final = md.local_path(ready, md.KOKORO_REPO, 'm.bin')
+    st = os.stat(final)
+    bad = bytearray(DATA['m.bin'])
+    bad[3] ^= 1
+    with open(final, 'wb') as f:
+        f.write(bad)
+    os.utime(final, ns=(st.st_atime_ns, st.st_mtime_ns))
+    after = os.stat(final)
+    assert after.st_size == st.st_size and after.st_mtime_ns == st.st_mtime_ns
+    assert md.repo_ready(ready, md.KOKORO_REPO) is False
+    assert off.models_cached(e) is False  # no _VERIFIED.clear() between checks
+    assert off.configure_at_startup(dict(e)) == {}
+
+
 def test_offline_module_is_import_light():
     import subprocess
     import sys

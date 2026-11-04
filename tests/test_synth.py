@@ -171,9 +171,12 @@ def _pinned_kokoro(tmp_path, monkeypatch, voice="af_heart"):
     return md
 
 
-def _fake_kokoro(monkeypatch):
+def _fake_kokoro(monkeypatch, language=True):
     import sys
     import types
+    from backend import model_download as md_
+    if language:
+        monkeypatch.setattr(md_, "language_ready", lambda: True)
     calls = []
 
     class KModel:
@@ -237,3 +240,33 @@ def test_synthesizer_requires_the_selected_local_voice(tmp_path, monkeypatch):
     with pytest.raises(md.ModelUnavailable, match="model_download"):
         Synthesizer(voice="am_adam", lang_code="a", device="cpu")
     assert calls == []
+
+
+@pytest.mark.parametrize("installed", [None, "3.7.1"])
+def test_missing_or_wrong_language_blocks_kokoro_import_and_construction(tmp_path, monkeypatch, installed):
+    import importlib.metadata
+    import socket
+    import sys
+    from pipeline.synth import Synthesizer
+    md = _pinned_kokoro(tmp_path, monkeypatch)  # valid pinned local files
+    calls = _fake_kokoro(monkeypatch, language=False)
+    monkeypatch.setitem(sys.modules, "kokoro", None)  # any import of kokoro would fail
+    attempts = []
+
+    def deny(*a, **k):
+        attempts.append(a)
+        raise AssertionError("network access attempted")
+    monkeypatch.setattr(socket, "socket", deny)
+    monkeypatch.setattr(socket, "create_connection", deny)
+    monkeypatch.setattr(socket, "getaddrinfo", deny)
+
+    def version(name):
+        if installed is None:
+            raise importlib.metadata.PackageNotFoundError(name)
+        return installed
+    monkeypatch.setattr(importlib.metadata, "version", version)
+    with pytest.raises(md.ModelUnavailable, match="Install Text2Audio.bat") as exc:
+        Synthesizer(voice="af_heart", lang_code="a", device="cpu")
+    assert "en_core_web_sm" in str(exc.value)
+    assert "model_download" not in str(exc.value)
+    assert calls == [] and attempts == []

@@ -25,7 +25,8 @@ OFFLINE_VARS = ("HF_HUB_OFFLINE", "TRANSFORMERS_OFFLINE", "HF_HUB_DISABLE_TELEME
 
 # True only when configure_at_startup() turned offline mode on in this process.
 _forced = False
-# (root, repo) -> stat signature of a fully digest-verified repo (avoids rehashing on every call).
+# Retained only for backward compatibility with callers/tests that clear it. Readiness never
+# trusts it: every check streams the digest of each pinned file (no size/mtime shortcut).
 _VERIFIED = {}
 
 
@@ -42,19 +43,10 @@ def _snapshots(env, repo):
 
 
 def _repo_ok(root, repo) -> bool:
-    try:
-        sig = tuple((st.st_size, st.st_mtime_ns) for st in (
-            os.stat(md.local_path(root, repo, s.rel)) for s in md.MANIFEST[repo][1]))
-    except OSError:
-        _VERIFIED.pop((root, repo), None)
-        return False
-    if _VERIFIED.get((root, repo)) == sig:
-        return True
-    if md.repo_ready(root, repo):
-        _VERIFIED[(root, repo)] = sig
-        return True
+    # Always exact size + streamed digest: a stat (size/mtime) signature can be
+    # forged by same-size corruption with a restored mtime, so nothing is cached.
     _VERIFIED.pop((root, repo), None)
-    return False
+    return md.repo_ready(root, repo)
 
 
 def models_cached(env=None, repos=KOKORO_REPOS) -> bool:

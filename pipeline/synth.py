@@ -105,6 +105,14 @@ class Synthesizer(BaseSynthesizer):
         # Exact size + streamed digest of config, weights and the selected voice BEFORE
         # any model construction; raises md.ModelUnavailable with install/repair guidance.
         md.require_files(md.KOKORO_REPO, ["config.json", "kokoro-v1_0.pth", f"voices/{voice}.pt"])
+        # Misaki would otherwise try an automatic GitHub/spaCy download of en_core_web_sm.
+        # Guard exact language readiness BEFORE importing or constructing anything.
+        if not md.language_ready():
+            raise md.ModelUnavailable(
+                "The English language model (en_core_web_sm %s) is missing or the wrong "
+                "version. Run Install Text2Audio.bat to install it, then try again. "
+                "Text2Audio does not download or install packages while rendering."
+                % md.LANGUAGE_VERSION)
         from kokoro import KModel, KPipeline
         paths = md.kokoro_paths()
         kmodel = KModel(config=paths["config"], model=paths["model"],
