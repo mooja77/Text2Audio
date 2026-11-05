@@ -11,6 +11,7 @@ import socket
 import subprocess
 import sys
 import types
+from contextlib import contextmanager
 from pathlib import Path
 
 import pytest
@@ -370,13 +371,68 @@ def test_hub_and_torch_not_imported_at_module_load():
     subprocess.run([sys.executable, '-c', code], cwd=str(ROOT), check=True)
 
 
-def test_api_voices_list_shape_unchanged(tmp_path, monkeypatch):
-    monkeypatch.setenv('T2A_LIBRARY_DIR', str(tmp_path / 'library'))
-    import server
-    importlib.reload(server)
-    payload = server.voices_payload()
+@contextmanager
+def isolated_server_module(tmp_path, monkeypatch):
+    """Import the real API with owned paths and restore any previous module."""
+    previous = sys.modules.get('server')
+    namespace = dict(vars(previous)) if previous is not None else None
+    with monkeypatch.context() as scoped:
+        paths = {
+            'HF_HOME': 'hf', 'HF_HUB_CACHE': 'hf/hub',
+            'T2A_SETTINGS_PATH': 'settings.json', 'T2A_LIBRARY_DIR': 'library',
+            'T2A_CACHE_DIR': 'cache', 'T2A_VOICES_DIR': 'voices',
+            'T2A_PRON_PATH': 'pron.json', 'T2A_CONSENT_PATH': 'consent.json',
+            'T2A_LOG_DIR': 'logs',
+        }
+        for key, relative in paths.items():
+            scoped.setenv(key, str(tmp_path / relative))
+        for key, value in {'T2A_DEVICE': 'cpu', 'T2A_PORT': '8765',
+                           'T2A_CACHE_MAX_BYTES': '1000000', 'T2A_NO_BROWSER': '1',
+                           'HF_HUB_OFFLINE': '1', 'TRANSFORMERS_OFFLINE': '1'}.items():
+            scoped.setenv(key, value)
+        try:
+            module = importlib.import_module('server')
+            if previous is not None:
+                module = importlib.reload(module)
+            yield module
+        finally:
+            if previous is None:
+                sys.modules.pop('server', None)
+            else:
+                vars(previous).clear()
+                vars(previous).update(namespace)
+                sys.modules['server'] = previous
+
+
+def test_api_voices_list_shape_unchanged(tmp_path, monkeypatch, no_sockets):
+    with isolated_server_module(tmp_path, monkeypatch) as server:
+        payload = server.voices_payload()
     assert payload[0]['id'] == 'studio_narrator' and payload[0]['kind'] == 'studio'
     assert [v['id'] for v in payload if v['kind'] == 'preset'] == list(PRESET_VOICES)
     for v in payload:
         assert {'id', 'label', 'accent', 'gender', 'kind', 'engine'} <= set(v)
     assert all(v['engine'] == 'kokoro' for v in payload if v['kind'] == 'preset')
+
+
+def test_api_import_ignores_inherited_paths_and_restores_module(tmp_path, monkeypatch, no_sockets):
+    inherited = tmp_path / 'inherited-host-surrogate'
+    keys = ('HF_HOME', 'HF_HUB_CACHE', 'T2A_SETTINGS_PATH', 'T2A_LIBRARY_DIR',
+            'T2A_CACHE_DIR', 'T2A_VOICES_DIR', 'T2A_PRON_PATH', 'T2A_CONSENT_PATH')
+    for key in keys:
+        monkeypatch.setenv(key, str(inherited / key))
+    previous = sys.modules.get('server')
+    saved = dict(vars(previous)) if previous is not None else None
+    owned = tmp_path / 'owned'
+    with isolated_server_module(owned, monkeypatch) as server:
+        for name in ('LIBRARY_DIR', 'VOICES_DIR', 'PRON_PATH', 'CONSENT_PATH'):
+            assert Path(getattr(server, name)).is_relative_to(owned)
+        assert md.hub_cache() == str(owned / 'hf/hub')
+        assert os.environ['T2A_CACHE_DIR'] == str(owned / 'cache')
+        assert os.environ['T2A_SETTINGS_PATH'] == str(owned / 'settings.json')
+        assert server.voices_payload()
+    assert not inherited.exists()
+    assert all(os.environ[key] == str(inherited / key) for key in keys)
+    assert sys.modules.get('server') is previous
+    if previous is not None:
+        assert vars(previous).keys() == saved.keys()
+        assert all(vars(previous)[key] is value for key, value in saved.items())
