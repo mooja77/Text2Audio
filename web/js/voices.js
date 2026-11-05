@@ -24,6 +24,13 @@ const Voices = {
       i.style.cssText = "background:var(--panel2);border:1px solid var(--bd);color:var(--tx);border-radius:8px;padding:9px 10px;font-size:14px;width:100%;margin-top:8px";
     });
     document.getElementById("cv-add").onclick = () => this.clone();
+    const cl = T2A.state.health && T2A.state.health.cloning;
+    if (cl && !cl.available) {
+      document.getElementById("cv-add").disabled = true;
+      const p = document.createElement("p");
+      p.textContent = "Voice cloning is unavailable: " + cl.reason;
+      document.getElementById("cv-notice").prepend(p);
+    }
     this.loadConsent();
     this.refresh();
   },
@@ -41,11 +48,12 @@ const Voices = {
     cards.innerHTML = T2A.state.voices.map(v => `
       <div class="vcard ${v.id === T2A.state.voice ? "sel" : ""}" data-v="${T2A.esc(v.id)}">
         <div class="dot"></div>
-        <div class="vn">${T2A.esc(v.label)} ${v.kind === "cloned" ? '<span style="font-size:10px;color:var(--ac2)">● cloned</span>' : v.kind === "studio" ? '<span style="font-size:10px;color:var(--ac2)">● studio</span>' : ""}</div>
+        <div class="vn">${T2A.esc(v.label)} ${v.kind === "cloned" ? '<span style="font-size:10px;color:var(--ac2)">�� cloned</span>' : v.kind === "studio" ? '<span style="font-size:10px;color:var(--ac2)">● studio</span>' : ""}</div>
         <div class="vm">${T2A.esc(v.accent)}${v.gender ? " · " + T2A.esc(v.gender) : ""}</div>
+        ${T2A.voiceBlocked(v) ? `<div class="vm" role="note">Unavailable: ${T2A.esc(T2A.voiceBlocked(v))}</div>` : ""}
         <div class="row">
-          <button class="btn play" data-v="${T2A.esc(v.id)}" aria-label="Play sample of ${T2A.esc(v.label)}">▶ Sample</button>
-          <button class="btn use" data-v="${T2A.esc(v.id)}" aria-label="Use ${T2A.esc(v.label)} as narrator">Use</button>
+          <button class="btn play" ${T2A.voiceBlocked(v) ? "disabled" : ""} data-v="${T2A.esc(v.id)}" aria-label="Play sample of ${T2A.esc(v.label)}">▶ Sample</button>
+          <button class="btn use" ${T2A.voiceBlocked(v) ? "disabled" : ""} data-v="${T2A.esc(v.id)}" aria-label="Use ${T2A.esc(v.label)} as narrator">Use</button>
           ${v.kind === "cloned" ? `<button class="btn del" data-v="${T2A.esc(v.id)}" aria-label="Delete ${T2A.esc(v.label)}">✕</button>` : ""}
         </div>
       </div>`).join("");

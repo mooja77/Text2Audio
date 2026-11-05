@@ -17,6 +17,7 @@ import soundfile as sf
 
 from pipeline.synth import BaseSynthesizer, FatalSynthError, SAMPLE_RATE
 from pipeline.engines import DEFAULT_ENGINE, INSTALL_HINT
+from backend.device_fallback import StudioUnavailable
 
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 WORKER_START_TIMEOUT = float(os.environ.get("T2A_ENGINE_START_TIMEOUT", "600"))
@@ -82,10 +83,16 @@ def _start_worker(engine: str = DEFAULT_ENGINE):
             _terminate(proc)
             raise RuntimeError(INSTALL_HINT)
         try:
-            if json.loads(line).get("ready") is True:
-                return proc
+            msg = json.loads(line)
         except Exception:
             continue  # ignore any stray non-protocol line
+        if not isinstance(msg, dict):
+            continue
+        if msg.get("unavailable"):  # the worker refused on purpose: say why, not an install hint
+            _terminate(proc)
+            raise StudioUnavailable(str(msg["unavailable"]))
+        if msg.get("ready") is True:
+            return proc
 
 
 class NeuralSynthesizer(BaseSynthesizer):
