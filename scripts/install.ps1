@@ -11,6 +11,8 @@ function Install-WithWinget($id, $name) {
         winget install -e --id $id --accept-source-agreements --accept-package-agreements
     } else {
         Write-Host "winget not found - please install $name manually." -ForegroundColor Yellow
+        $vp = Join-Path $ProjectRoot ".venv\Scripts\python.exe"
+        if (Test-Path $vp) { & $vp (Join-Path $PSScriptRoot "install_support.py") --winget-guidance }
     }
 }
 
@@ -103,6 +105,10 @@ if (-not (Test-Path $vpy)) {
 & $vpy -m pip install --upgrade pip | Out-Null
 if ($LASTEXITCODE -ne 0) { Fail "Could not upgrade pip. Check your internet connection and try again." }
 
+# Pre-install hardware check (Python support; never fatal)
+$support = Join-Path $PSScriptRoot "install_support.py"
+& $vpy $support --stage pre
+
 # 3) PyTorch (CUDA if an NVIDIA GPU is present, else CPU).
 # Pinned to 2.6.0: Chatterbox (the studio voice and cloning engine) requires exactly
 # torch/torchaudio 2.6.0. Installing it first from the CUDA index keeps the GPU build;
@@ -140,6 +146,14 @@ if (-not (Have "espeak-ng") -and -not (Test-Path "C:\Program Files\eSpeak NG\esp
     Write-Host "espeak-ng is still unavailable. Install it manually before using Kokoro." -ForegroundColor Yellow
 }
 
+# 5b) Model, language package, post hardware check and offline-readiness gate (all in Python)
+foreach ($stage in "prepare", "post", "verify") {
+    & $vpy $support --stage $stage
+    if ($LASTEXITCODE -ne 0) {
+        Fail "Setup is not finished (step '$stage'). Nothing is lost: double-click 'Install Text2Audio.bat' again to continue. The log file path is shown above."
+    }
+}
+
 # 6) Desktop shortcut
 try {
     $desktop = [Environment]::GetFolderPath("Desktop")
@@ -157,5 +171,5 @@ try {
 Write-Host "`n=====================================================" -ForegroundColor Green
 Write-Host "  Done! Double-click 'Text2Audio' on your Desktop"     -ForegroundColor Green
 Write-Host "  (or 'Start Text2Audio' in this folder) to run it."   -ForegroundColor Green
-Write-Host "  The studio voice and cloning download ~3 GB on first use." -ForegroundColor Green
+Write-Host "  Voice models and language package are installed; works offline." -ForegroundColor Green
 Write-Host "=====================================================" -ForegroundColor Green

@@ -29,4 +29,17 @@ def test_engine_errors_are_plain_language():
     assert "studio voice engine" in friendly_error(
         "install chatterbox-tts to use the studio voice and cloned voices")
     assert "studio voice engine" in friendly_error("voice engine worker exited unexpectedly")
+
+
+def test_missing_models_point_to_installer_not_first_audiobook(tmp_path):
+    items = first_run_checklist(True, True, False, str(tmp_path))
+    models = next(i for i in items if i["id"] == "models")
+    assert "Install Text2Audio.bat" in models["action"]
+    assert "first audiobook" not in models["action"]
+    assert "language package" in models["action"]
+
+
+def test_missing_language_model_error_points_to_installer():
+    msg = friendly_error("The English language model (en_core_web_sm 3.8.0) is missing")
+    assert "Install Text2Audio.bat" in msg and "language package" in msg
     assert "took too long" in friendly_error("voice engine synthesis timed out")
