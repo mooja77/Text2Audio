@@ -29,8 +29,8 @@ commercial use, so you may sell the audiobooks you make.
 
 Don't want to touch a command line? On Windows you can be up and running in three steps:
 
-1. **[Download the project as a ZIP](https://github.com/mooja77/Text2Audio/archive/refs/heads/master.zip)** and unzip it somewhere (for example, your Desktop). **You need Python 3.12 installed first** — get it from [python.org](https://www.python.org/downloads/windows/) and tick **"Add python.exe to PATH"** (or run `winget install Python.Python.3.12`).
-2. Double-click **`Install Text2Audio.bat`**. It checks for Python (3.10–3.12; if it's missing it tells you how to install it, see [INSTALL.md](INSTALL.md)), then sets up the app, its dependencies, ffmpeg, and espeak-ng. The first run takes a while; just let it finish.
+1. **[Download the project as a ZIP](https://github.com/mooja77/Text2Audio/archive/refs/heads/master.zip)** and unzip it somewhere you want to keep the app.
+2. Double-click **`Install Text2Audio.bat`**. It finds a supported Python (3.10–3.12), tries winget if Python is missing, and explains manual installation if needed. It installs the dependencies, audio tools, pinned voice models and English language package. Wait for **Done!**; the models are prepared during installation.
 3. Double-click **`Start Text2Audio`** (the installer also adds a shortcut to your Desktop). Your browser opens the Studio — start making audiobooks. Keep the little black window open while you use the app; closing it stops Text2Audio.
 
 Inside Studio, the optional five-step beginner guide is resumable and dismissible:
@@ -50,7 +50,7 @@ plus its local manifest is the durable first useful result.
 - **[Ask for help](https://github.com/mooja77/Text2Audio/issues/new?template=bug_report.yml)**
 - **[Request a feature](https://github.com/mooja77/Text2Audio/issues/new?template=feature_request.yml)**
 
-> 💡 The first time you generate audio, the voice model (a few hundred MB) downloads automatically. After that, everything runs fully offline.
+> The installer shows the current model file, downloaded MB and percentage. A stopped download can resume when you run the installer again. Verified files and your existing settings are kept. Setup checks offline readiness before creating the Desktop shortcut.
 >
 > ⚠️ Windows may show a blue **"Windows protected your PC"** SmartScreen box on the `.bat` files — click **More info → Run anyway** (see below). The scripts are plain text you can open and read first. A full walkthrough, voice-cloning setup, and troubleshooting live in **[INSTALL.md](INSTALL.md)**.
 
@@ -60,12 +60,11 @@ plus its local manifest is the durable first useful result.
 
 ```bash
 pip install git+https://github.com/mooja77/Text2Audio
-text2audio
 ```
 
 This installs both engines (Chatterbox and Kokoro). You'll still need **ffmpeg** and **espeak-ng** installed on your system, and — for GPU
 speed — a CUDA build of PyTorch (`pip` pulls the CPU build by default). See
-[Setup](#setup) below for the details.
+[Setup](#setup) below for model and language-package preparation before starting the app.
 
 ---
 
@@ -82,8 +81,8 @@ speed — a CUDA build of PyTorch (`pip` pulls the CPU build by default). See
 - 🗣️ **Reads text correctly** — expands numbers/abbreviations and an editable
   **pronunciation dictionary** fixes tricky names.
 - 🎙️ **Studio narrator voice** — Chatterbox (Resemble AI, MIT), the best open-source
-  model in our November 2026 bake-off, is the default narrator on PCs with an NVIDIA
-  graphics card. Kokoro's 15 voices stay as the fast option for any PC.
+  model in our November 2026 bake-off, is available when the hardware check finds
+  usable NVIDIA CUDA and enough free GPU memory. Kokoro's 15 voices stay as the fast option for any PC.
 - 🎤 **Voice cloning** — upload ~10–30 s of speech and narrate in that voice, via
   Chatterbox (runs in an isolated worker). The code and weights are MIT, so cloned
   audiobooks can be sold. The app asks you once to confirm you have the right to
@@ -134,7 +133,7 @@ cd Text2Audio
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 # Install a CUDA build of PyTorch first (pick the index for your CUDA version):
-pip install --index-url https://download.pytorch.org/whl/cu124 torch
+pip install --index-url https://download.pytorch.org/whl/cu124 torch==2.6.0 torchaudio==2.6.0
 pip install -r requirements.txt
 ```
 
@@ -159,6 +158,27 @@ The project is plain Python and cross-platform. The commands are the same, excep
   the default CPU/MPS build on macOS — note Kokoro and Chatterbox are much faster on CUDA).
   Chatterbox pins `torch==2.6.0` and `torchaudio==2.6.0`, so install those
   versions from your index first.
+
+### Prepare models for a manual or pip installation
+
+The Windows double-click installer performs this preparation for you. For a manual
+installation, run these commands in the environment where Text2Audio is installed:
+
+```powershell
+python -m backend.hardware --post-install
+python -m backend.model_download
+python -m pip install "https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl#sha256=1932429db727d4bff3deed6b34cfc05df17794f4a52eeb26cf8928f7c1a0fb85"
+python -c "import spacy; spacy.load('en_core_web_sm')"
+```
+
+After preparation, start a pip installation with `text2audio`. For a source
+checkout, use the [Run](#run) command below.
+
+The downloader always prepares all 15 English Kokoro voices. It also prepares
+Chatterbox when the saved hardware check permits it. `T2A_DOWNLOAD_CHATTERBOX=1`
+requests an optional prefetch; it does not enable Studio on a CPU-only runtime.
+The language package must be version 3.8.0 and load successfully. The Windows
+installer repairs a damaged copy of that same version without replacing dependencies.
 
 ## Run
 
@@ -190,18 +210,27 @@ same answer. Before v1.4.0 both endpoints answered HTTP 400. Voice lookup now li
 (`backend/render.py::resolve_synthesizer`). No new models or libraries were
 added, and nothing here touches the network.
 
-### Offline after the first download
+### Offline readiness and CPU fallback
 
-Once the Kokoro model is in the Hugging Face cache, Text2Audio sets
-`HF_HUB_OFFLINE` and `TRANSFORMERS_OFFLINE` at startup, before any model library
-is imported, so a render opens no network connections. On the very first run the
-model is not cached yet, so the app stays online to download it; the offline
-setting applies from the next start. Choosing a narrator voice you have not used
-before still works on a connected PC: that one voice file is downloaded once. If
-you set `HF_HUB_OFFLINE` yourself, Text2Audio leaves it alone. The studio-voice
-worker does the same once the Chatterbox files (pinned to one verified revision)
-are cached, and it is started with the offline settings passed explicitly. `tests/test_render.py` checks that a mocked
-render never opens a socket.
+Installation downloads pinned model files with a disk-space check, byte progress,
+resumable partial files and digest verification. Runtime loads those same local
+paths. Full offline readiness requires all English Kokoro voices and the English
+language package; a GPU runtime also requires the pinned Chatterbox files. An
+optional Chatterbox prefetch never blocks CPU readiness.
+
+The app sets `HF_HUB_OFFLINE` and `TRANSFORMERS_OFFLINE` before model-library imports
+once the required files are ready. Existing explicit offline settings are respected.
+Missing or damaged files direct you back to the installer instead of downloading
+unseen files during a render. The cache follows `HF_HUB_CACHE`, then
+`HF_HOME` plus `/hub`, then the usual per-user Hugging Face cache.
+
+The hardware check saves its result in `data/settings.json` for a source checkout,
+preserving other settings. Runtime checks available memory again. A CPU override
+(`T2A_DEVICE=cpu`) takes priority: Kokoro/Heart becomes the default and Studio and
+cloning are disabled with an explanation. After a CUDA out-of-memory error,
+Kokoro's CPU fallback is remembered until restart. A late Studio refusal or GPU memory
+failure stops that Studio job with guidance; choose a Kokoro voice to continue.
+`GET /api/health` reports `device`, `engines`, `defaultVoice` and the availability reasons.
 
 ### First-run checklist and error messages
 
@@ -231,8 +260,9 @@ treats the whole text as one chapter.
 
 Both use **Chatterbox** (Resemble AI; MIT code and MIT weights), installed with the
 app. It runs in an isolated worker process, so the server stays light and Kokoro
-never shares a process with it. The first use downloads about 3.2 GB of weights,
-pinned to the revision whose licence was checked. After that it runs offline.
+never shares a process with it. Installation prepares its pinned weights when a
+usable GPU is available. Their sourced manifest size is about 3.2 GB, in addition
+to the Kokoro models. Runtime uses the prepared local files.
 
 In **Voices → Clone a voice**, tick the box once to confirm you have the right to
 clone the voice. Then name the voice and upload 10–30 s of clean speech from one
@@ -254,6 +284,10 @@ people or create deceptive audio. You are responsible for how you use this tool.
 ## Tests
 
 The suite runs **without a GPU** (the TTS engines are mocked):
+
+Developer tests require **Node.js on PATH** as well as pytest: the suite runs the
+real JavaScript UI behaviour checks. Node is only a test prerequisite; the installed
+Python app runs without it.
 
 ```powershell
 pytest -q

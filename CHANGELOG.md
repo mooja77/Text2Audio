@@ -6,6 +6,25 @@ All notable changes to Text2Audio are recorded here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- I-1: NVIDIA and post-install CUDA/free-memory checks, with hardware results
+  merged into existing settings.
+- I-2: pinned Kokoro and optional Chatterbox model preparation with byte progress,
+  disk-space checks, resumable partial downloads, digest repair and shared local
+  cache paths. All English voices and the English language package are required
+  for offline readiness.
+- I-3: CPU/Kokoro fallback with persistent runtime state, explicit device override
+  precedence, Studio/cloning refusal reasons and `device`/`engines` health fields.
+  Late Studio memory failures stop the job with actionable guidance.
+- I-4: packaged launcher checks, loopback port selection, plain startup/bind
+  messages, persistent diagnostics and browser opening gated on this server's PID.
+- I-5: Windows installer orchestration through Python support stages, including
+  early persistent logging, pinned language-package repair and offline verification
+  before success or Desktop shortcut creation.
+- Integration tests for installer/runtime seams, with isolated server import and
+  inherited-path regressions. Existing batch files are unchanged.
+
 ## [1.5.0] - 2026-11-04
 
 New voice engine. The studio narrator and voice cloning now use Chatterbox
