@@ -52,9 +52,24 @@ const T2A = {
     box.innerHTML = `<h2 class="fr-title">Finish setting up</h2><ul class="fr-list">` + items.map(i =>
       `<li class="${i.ok ? "ok" : "bad"}"><span class="fr-state">${i.ok ? "✓ Ready" : "✗ Needs attention"}</span> <strong>${T2A.esc(i.label)}</strong> — ${T2A.esc(i.detail)}${i.ok ? "" : `<div class="fr-action">What to do: ${T2A.esc(i.action)}</div>`}</li>`).join("") + `</ul>`;
   },
+  safeMsg(e, fallback) { return e && e.safe ? e.message : fallback; },
+  // Reload health + voices after a real load/chunk fallback or failed job, then refresh both UIs.
+  async refreshHealth() {
+    try {
+      const health = await T2A.api("/api/health");
+      T2A.state.health = health;
+      T2A.state.voices = await T2A.api("/api/voices");
+      const cur = T2A.state.voices.find(v => v.id === T2A.state.voice);
+      if ((!cur || T2A.voiceBlocked(cur)) && T2A.state.voices.some(v => v.id === health.defaultVoice)) T2A.state.voice = health.defaultVoice;
+      T2A.renderChecklist(health.checklist);
+      T2A.cpuNotice(health);
+      Create.refreshVoices();
+      Voices.syncClone();
+    } catch (e) { /* keep the last known state */ }
+  },
   async api(path, opts) {
     const r = await fetch(path, opts);
-    if (!r.ok) throw new Error(T2A.friendly(await r.text(), r.status));
+    if (!r.ok) throw Object.assign(new Error(T2A.friendly(await r.text(), r.status)), { safe: true });
     return r.headers.get("content-type")?.includes("application/json") ? r.json() : r;
   },
   // Assertive announcement for errors (region lives in index.html).

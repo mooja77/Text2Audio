@@ -24,14 +24,35 @@ const Voices = {
       i.style.cssText = "background:var(--panel2);border:1px solid var(--bd);color:var(--tx);border-radius:8px;padding:9px 10px;font-size:14px;width:100%;margin-top:8px";
     });
     document.getElementById("cv-add").onclick = () => this.clone();
-    const cl = T2A.state.health && T2A.state.health.cloning;
-    if (cl && !cl.available) {
-      document.getElementById("cv-add").disabled = true;
-      const p = document.createElement("p");
-      p.textContent = "Voice cloning is unavailable: " + cl.reason;
-      document.getElementById("cv-notice").prepend(p);
-    }
+    this.applyCloneState();
     this.loadConsent();
+    this.refresh();
+  },
+
+  // Enable/disable the clone button and show the plain reason from the latest health.
+  applyCloneState() {
+    const add = document.getElementById("cv-add");
+    if (!add) return false;
+    const cl = T2A.state.health && T2A.state.health.cloning;
+    const blocked = Boolean(cl && !cl.available);
+    add.disabled = blocked;
+    let p = document.getElementById("cv-unavail");
+    if (blocked) {
+      if (!p) {
+        p = document.createElement("p");
+        p.id = "cv-unavail"; p.setAttribute("role", "status");
+        document.getElementById("cv-notice").prepend(p);
+      }
+      p.textContent = "Voice cloning is unavailable: " + cl.reason;
+    } else if (p) {
+      p.remove();
+    }
+    return true;
+  },
+
+  // Called after health is refreshed (load/chunk fallback or failed job).
+  syncClone() {
+    if (!this.applyCloneState()) return;
     this.refresh();
   },
 
@@ -45,10 +66,11 @@ const Voices = {
   async refresh() {
     try { T2A.state.voices = await T2A.api("/api/voices"); } catch (e) {}
     const cards = document.getElementById("vcards");
+    if (!cards) return;
     cards.innerHTML = T2A.state.voices.map(v => `
       <div class="vcard ${v.id === T2A.state.voice ? "sel" : ""}" data-v="${T2A.esc(v.id)}">
         <div class="dot"></div>
-        <div class="vn">${T2A.esc(v.label)} ${v.kind === "cloned" ? '<span style="font-size:10px;color:var(--ac2)">�� cloned</span>' : v.kind === "studio" ? '<span style="font-size:10px;color:var(--ac2)">● studio</span>' : ""}</div>
+        <div class="vn">${T2A.esc(v.label)} ${v.kind === "cloned" ? '<span style="font-size:10px;color:var(--ac2)">● cloned</span>' : v.kind === "studio" ? '<span style="font-size:10px;color:var(--ac2)">● studio</span>' : ""}</div>
         <div class="vm">${T2A.esc(v.accent)}${v.gender ? " · " + T2A.esc(v.gender) : ""}</div>
         ${T2A.voiceBlocked(v) ? `<div class="vm" role="note">Unavailable: ${T2A.esc(T2A.voiceBlocked(v))}</div>` : ""}
         <div class="row">
@@ -66,7 +88,7 @@ const Voices = {
       try {
         await T2A.api(`/api/voices/${encodeURIComponent(b.dataset.v)}`, { method: "DELETE" });
         T2A.toast("Deleted"); this.refresh();
-      } catch (err) { T2A.toast("Delete failed: " + err.message); }
+      } catch (err) { T2A.toast("Delete failed: " + T2A.safeMsg(err, "please try again.")); }
     });
   },
 
@@ -91,7 +113,10 @@ const Voices = {
       await T2A.api("/api/voices/clone", { method: "POST", body: fd });
       document.getElementById("cv-name").value = ""; document.getElementById("cv-text").value = "";
       T2A.toast("Voice created"); this.refresh();
-    } catch (e) { T2A.alert("Clone failed — check the audio file"); }
+    } catch (e) {
+      T2A.alert("Clone failed: " + T2A.safeMsg(e, "check the audio file and try again."));
+      T2A.refreshHealth();
+    }
   },
 
   async sample(voice, btn) {
@@ -99,10 +124,13 @@ const Voices = {
     try {
       const r = await fetch("/api/voice-preview", { method: "POST",
         headers: { "Content-Type": "application/json" }, body: JSON.stringify({ voice }) });
-      if (!r.ok) throw new Error(await r.text());
+      if (!r.ok) throw Object.assign(new Error(T2A.friendly(await r.text(), r.status)), { safe: true });
       const blob = await r.blob(); const url = URL.createObjectURL(blob); const audio = new Audio(url);
       audio.onended = audio.onerror = () => URL.revokeObjectURL(url); await audio.play();
-    } catch (e) { T2A.toast("Sample failed"); }
+    } catch (e) {
+      T2A.alert("Sample failed: " + T2A.safeMsg(e, "please try again."));
+      T2A.refreshHealth();
+    }
     btn.textContent = old;
   },
 };

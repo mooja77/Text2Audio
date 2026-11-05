@@ -11,6 +11,7 @@ torch is imported lazily, only when a CUDA check is needed.
 """
 import math
 import os
+import threading
 from dataclasses import dataclass
 
 from backend import hardware
@@ -41,6 +42,35 @@ OOM_STUDIO_INFERENCE = ('The graphics card ran out of memory while making the st
 
 class StudioUnavailable(FatalSynthError, RuntimeError):
     """The studio voice or cloning cannot run here; the message is plain words."""
+
+
+OOM_RUNTIME_CPU = ('The graphics card ran out of memory while making the fast voice, so Text2Audio '
+                   'switched to your processor. The studio voice and voice cloning are unavailable '
+                   'until you restart Text2Audio and free some graphics memory.')
+
+# Actual effective fallback state: once a real load or chunk OOM moved synthesis to the CPU,
+# later eligibility rechecks must not report CUDA again. Guarded by a lock (jobs run in threads).
+_runtime_lock = threading.Lock()
+_runtime_cpu_reason = None
+
+
+def note_runtime_cpu(reason=None):
+    global _runtime_cpu_reason
+    with _runtime_lock:
+        if _runtime_cpu_reason is None:
+            _runtime_cpu_reason = reason or OOM_RUNTIME_CPU
+
+
+def runtime_cpu_reason():
+    with _runtime_lock:
+        return _runtime_cpu_reason
+
+
+def reset_runtime_fallback():
+    """A controlled restart/reset (and test fixtures) clear the runtime fallback."""
+    global _runtime_cpu_reason
+    with _runtime_lock:
+        _runtime_cpu_reason = None
 
 
 @dataclass(frozen=True)
@@ -86,6 +116,9 @@ def resolve_device(env=None, settings_path=None, torch_module=None, engine_insta
         return DeviceDecision('mps', False, MPS_ONLY)
     if forced not in ('', 'cuda'):
         return _cpu(BAD_VALUE)
+    runtime = runtime_cpu_reason()
+    if runtime:
+        return _cpu(runtime)
     if forced == '':
         path = settings_path or env.get('T2A_SETTINGS_PATH') or hardware.DEFAULT_SETTINGS_PATH
         if not hardware.gpu_usable_from_settings(path):
@@ -134,7 +167,9 @@ def build_kokoro(voice_id, speed, device, synth_cls=None):
         if device != 'cuda' or not is_cuda_oom(exc):
             raise
         _free_cuda()
-        return make('cpu')
+        synth = make('cpu')
+        note_runtime_cpu()
+        return synth
     if device == 'cuda':
         original = synth.synth_chunk
 
@@ -146,6 +181,7 @@ def build_kokoro(voice_id, speed, device, synth_cls=None):
                     raise
                 synth.__dict__.pop('synth_chunk', None)
                 synth.__dict__.update(make('cpu').__dict__)
+                note_runtime_cpu()
                 _free_cuda()
                 return synth.synth_chunk(text)
         synth.synth_chunk = safe
