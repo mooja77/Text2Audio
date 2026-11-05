@@ -3,12 +3,9 @@ from backend.offline import configure_at_startup, models_cached
 
 OFFLINE_STATE = configure_at_startup()  # must run before huggingface_hub/transformers are imported
 
-try:
-    from scripts import launch_checks as _lc
-except ImportError:  # not shipped in a pip install
-    _lc = None
-if _lc is not None:
-    _lc.bootstrap_or_exit()  # plain message instead of a traceback if FastAPI/soundfile are missing
+from backend import launch_checks as _lc  # stdlib only; ships in the wheel as well as the checkout
+
+_lc.bootstrap_or_exit()  # plain message instead of a traceback if a required package is missing
 
 import io
 import importlib.util
@@ -55,7 +52,7 @@ ROOT = Path(__file__).parent
 
 # The only security boundary is the loopback bind (no auth). Not configurable.
 BIND_HOST = "127.0.0.1"
-BIND_PORT = _lc.port_from_env(os.environ) if _lc is not None else 8765  # T2A_PORT, loopback only
+BIND_PORT = _lc.port_from_env(os.environ)  # T2A_PORT, loopback only
 
 
 def assert_loopback(host: str) -> None:
@@ -635,7 +632,7 @@ _mount_static()
 
 def launch_preflight() -> int:
     """Installed? port free? log written? Prints plain-words results; 0 means go."""
-    return 0 if _lc is None else _lc.run_preflight(port=BIND_PORT)
+    return _lc.run_preflight(port=BIND_PORT)
 
 
 def main():
@@ -646,22 +643,27 @@ def main():
     if code:
         raise SystemExit(code)
     cancel = threading.Event()
-    if _lc is not None and os.environ.get("T2A_NO_BROWSER") != "1":
+    logs = _lc.setup_server_logging()  # uvicorn records go to the quoted launch log
+    if os.environ.get("T2A_NO_BROWSER") != "1":
         # Opens only once this process answers /api/health, i.e. after a real bind.
         threading.Thread(target=_lc.wait_and_open, daemon=True, kwargs=dict(
             url=f"http://{host}:{port}", health_url=f"http://{host}:{port}/api/health",
             cancel=cancel, expected_pid=os.getpid())).start()
     try:
-        uvicorn.run(app, host=host, port=port, log_level="info")
+        uvicorn.run(app, host=host, port=port, log_level="info", log_config=None)
     except (OSError, SystemExit) as exc:
         if isinstance(exc, SystemExit) and not exc.code:
             raise
         cancel.set()
-        if _lc is not None:
+        bind = logs.bind_error or (isinstance(exc, OSError) and exc.errno in _lc.BIND_ERRNOS)
+        if bind:
             _lc.report_bind_failure(port)  # bind race after the probe: plain words, no errno
+        else:
+            _lc.report_startup_failure(port)  # unrelated failure: never labelled as a busy port
         raise SystemExit(1) from None
     finally:
         cancel.set()
+        logs.close()
 
 
 if __name__ == "__main__":

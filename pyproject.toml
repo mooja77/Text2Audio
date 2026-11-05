@@ -36,6 +36,7 @@ Repository = "https://github.com/mooja77/Text2Audio"
 
 [project.scripts]
 text2audio = "server:main"
+text2audio-check = "backend.launch_checks:main"
 
 [tool.hatch.build.targets.wheel]
 include = ["server.py", "app.py", "md_to_book.py", "pipeline", "backend", "web", "samples", "assets", "docs/LICENSES.md"]

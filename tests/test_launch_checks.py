@@ -173,3 +173,167 @@ def test_server_main_exits_nonzero_when_preflight_fails(monkeypatch):
     with pytest.raises(SystemExit) as exc:
         server.main()
     assert exc.value.code == 1 and ran == []
+
+
+def _gone(*names):
+    return lambda name: None if name in names else object()
+
+
+def test_missing_num2words_gets_plain_install_guidance(tmp_path):
+    out = []
+    code = lc.run_preflight(port=8765, env=win_env(tmp_path), out=out.append, probe=lambda p: True,
+                            find_spec=_gone('num2words'), platform='win32')
+    text = '\n'.join(out)
+    assert code == 1 and 'num2words' in text and 'Install Text2Audio.bat' in text
+    assert 'python-multipart' not in text and 'Traceback' not in text
+
+
+def test_missing_python_multipart_gets_plain_install_guidance(tmp_path):
+    out = []
+    code = lc.run_preflight(port=8765, env=win_env(tmp_path), out=out.append, probe=lambda p: True,
+                            find_spec=_gone('python_multipart', 'multipart'), platform='win32')
+    text = '\n'.join(out)
+    assert code == 1 and 'python-multipart' in text and 'Install Text2Audio.bat' in text
+    assert 'num2words' not in text and 'Traceback' not in text
+
+
+def test_either_multipart_module_name_satisfies_the_check():
+    assert lc.missing_dependencies(_gone('multipart')) == []
+    assert lc.missing_dependencies(_gone('python_multipart')) == []
+    assert lc.missing_dependencies(_gone('python_multipart', 'multipart')) == ['python-multipart']
+    assert lc.missing_dependencies(_gone('num2words')) == ['num2words']
+
+
+def test_bootstrap_exits_for_each_new_eager_dependency(tmp_path):
+    for gone in (('num2words',), ('python_multipart', 'multipart')):
+        out, codes = [], []
+        lc.bootstrap_or_exit(find_spec=_gone(*gone), env=win_env(tmp_path), out=out.append,
+                             exit_fn=codes.append, platform='win32')
+        assert codes == [1] and 'Log file: "' in out[1]
+
+
+@pytest.mark.parametrize('blocked, shown', [(('num2words',), 'num2words'),
+                                            (('python_multipart', 'multipart'), 'python-multipart')])
+def test_importing_server_stops_friendly_before_external_imports(tmp_path, blocked, shown):
+    import subprocess
+    import sys
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    code = (
+        'import sys, importlib.abc\n'
+        'class B(importlib.abc.MetaPathFinder):\n'
+        '    def find_spec(self, name, path, target=None):\n'
+        '        if name in %r:\n'
+        '            raise ModuleNotFoundError(name)\n'
+        'sys.meta_path.insert(0, B())\n'
+        'import server\n' % (blocked,))
+    env = dict(os.environ, T2A_LOG_DIR=str(tmp_path / 'logs'))
+    done = subprocess.run([sys.executable, '-c', code], cwd=root, env=env,
+                          capture_output=True, text=True, timeout=120)
+    assert done.returncode == 1
+    assert shown in done.stdout and 'Install Text2Audio.bat' in done.stdout
+    assert 'Traceback' not in done.stderr
+
+
+def _run_main_with_fake_uvicorn(monkeypatch, tmp_path, fake_run):
+    import uvicorn
+    import server
+    monkeypatch.setenv('T2A_NO_BROWSER', '1')
+    monkeypatch.setenv('T2A_LOG_DIR', str(tmp_path / 'My Logs'))
+    monkeypatch.setattr(server, 'launch_preflight', lambda: 0)
+    monkeypatch.setattr(uvicorn, 'run', fake_run)
+    with pytest.raises(SystemExit) as exc:
+        server.main()
+    return exc.value.code, tmp_path / 'My Logs' / 'launch.log'
+
+
+def test_bind_race_uvicorn_error_goes_to_quoted_log_not_console(monkeypatch, tmp_path, capsys):
+    import logging
+
+    def fake_run(app, **kw):
+        logging.getLogger('uvicorn.error').error(OSError(
+            10048, "error while attempting to bind on address ('127.0.0.1', 8765): only one usage"))
+        raise SystemExit(1)
+
+    code, log = _run_main_with_fake_uvicorn(monkeypatch, tmp_path, fake_run)
+    seen = capsys.readouterr()
+    assert code == 1
+    assert 'Errno' not in seen.out + seen.err and 'Traceback' not in seen.out + seen.err
+    assert 'could not start on port 8765' in seen.out
+    assert 'Log file: "%s"' % log in seen.out
+    assert 'Errno 10048' in log.read_text(encoding='utf-8')
+
+
+def test_unrelated_startup_failure_is_logged_and_not_called_port_busy(monkeypatch, tmp_path, capsys):
+    import logging
+
+    def fake_run(app, **kw):
+        logging.getLogger('uvicorn.error').error('lifespan exploded')
+        raise SystemExit(1)
+
+    code, log = _run_main_with_fake_uvicorn(monkeypatch, tmp_path, fake_run)
+    seen = capsys.readouterr()
+    assert code == 1
+    assert 'could not start on port' not in seen.out and 'already in use' not in seen.out
+    assert 'Log file: "%s"' % log in seen.out
+    assert 'lifespan exploded' in log.read_text(encoding='utf-8')
+
+
+def test_bind_error_stays_visible_when_no_log_can_be_written(monkeypatch, tmp_path):
+    import io
+    import logging
+    from backend import launch_checks as impl
+
+    def deny(*a, **k):
+        raise OSError('no write')
+
+    monkeypatch.setattr(impl.logging, 'FileHandler', deny)
+    env = {'T2A_LOG_DIR': str(tmp_path / 'a'), 'HOME': str(tmp_path), 'USERPROFILE': str(tmp_path),
+           'LOCALAPPDATA': str(tmp_path), 'XDG_STATE_HOME': str(tmp_path)}
+    stream = io.StringIO()
+    state = impl.setup_server_logging(env=env, platform='linux', stream=stream)
+    try:
+        logging.getLogger('uvicorn.error').error(OSError(98, 'error while attempting to bind'))
+    finally:
+        state.close()
+    assert state.written is False and state.bind_error is True
+    assert 'Errno 98' in stream.getvalue()
+
+
+def test_launch_helper_ships_in_wheel_without_scripts_package(monkeypatch):
+    import importlib
+    import re
+    import sys
+    from pathlib import Path
+    root = Path(__file__).resolve().parent.parent
+    text = (root / 'pyproject.toml').read_text(encoding='utf-8')
+    wheel = text[text.index('[tool.hatch.build.targets.wheel]'):]
+    include = re.search(r'include\s*=\s*\[(.*?)\]', wheel, re.S).group(1)
+    assert '"backend"' in include and '"server.py"' in include and 'scripts' not in include
+    assert 'from scripts' not in (root / 'server.py').read_text(encoding='utf-8')
+    assert (root / 'backend' / 'launch_checks.py').is_file()
+    import server
+    monkeypatch.setitem(sys.modules, 'scripts', None)
+    monkeypatch.setitem(sys.modules, 'scripts.launch_checks', None)
+    importlib.reload(server)
+    assert server._lc is not None and server._lc.__name__ == 'backend.launch_checks'
+
+
+def test_installed_layout_still_runs_preflight_and_opens_browser(monkeypatch, tmp_path):
+    import importlib
+    import sys
+    import uvicorn
+    import server
+    monkeypatch.setitem(sys.modules, 'scripts', None)
+    monkeypatch.setitem(sys.modules, 'scripts.launch_checks', None)
+    importlib.reload(server)
+    monkeypatch.delenv('T2A_NO_BROWSER', raising=False)
+    checked, opened = [], []
+    monkeypatch.setattr(server._lc, 'run_preflight', lambda **kw: checked.append(kw) or 0)
+    monkeypatch.setattr(server._lc, 'wait_and_open', lambda **kw: opened.append(kw['url']))
+    monkeypatch.setattr(uvicorn, 'run', lambda app, **kw: None)
+    server.main()
+    deadline = time.time() + 3
+    while not opened and time.time() < deadline:
+        time.sleep(0.02)
+    assert checked == [{'port': server.BIND_PORT}]
+    assert opened == ['http://127.0.0.1:%d' % server.BIND_PORT]
