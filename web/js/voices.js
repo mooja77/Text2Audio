@@ -129,8 +129,9 @@ const Voices = {
       audio.onended = audio.onerror = () => URL.revokeObjectURL(url); await audio.play();
     } catch (e) {
       T2A.alert("Sample failed: " + T2A.safeMsg(e, "please try again."));
+    } finally {
+      btn.textContent = old;
       T2A.refreshHealth();
     }
-    btn.textContent = old;
   },
 };

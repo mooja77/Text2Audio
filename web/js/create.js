@@ -222,8 +222,8 @@ const Create = {
       if (!r.ok) throw Object.assign(new Error(T2A.friendly(await r.text(), r.status)), { safe: true });
       const blob = await r.blob(); const url = URL.createObjectURL(blob); const audio = new Audio(url);
       audio.onended = audio.onerror = () => URL.revokeObjectURL(url); await audio.play();
-    } catch (e) { T2A.alert(T2A.safeMsg(e, "Preview failed. Please try again.")); T2A.refreshHealth(); }
-    btn.textContent = "▶ Preview";
+    } catch (e) { T2A.alert(T2A.safeMsg(e, "Preview failed. Please try again.")); }
+    finally { btn.textContent = "▶ Preview"; T2A.refreshHealth(); }
   },
 
   async generate() {
