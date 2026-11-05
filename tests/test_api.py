@@ -1,3 +1,4 @@
+from tests.server_isolation import assert_server_owned_paths
 import os
 import pytest
 from fastapi.testclient import TestClient
@@ -8,6 +9,7 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setenv("T2A_LIBRARY_DIR", str(tmp_path / "library"))
     import importlib, server
     importlib.reload(server)
+    assert_server_owned_paths(server, tmp_path)
     monkeypatch.setattr(server, "device_decision", lambda: server.DeviceDecision("cuda", True, ""))
     with TestClient(server.app) as c:
         yield c

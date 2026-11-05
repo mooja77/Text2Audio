@@ -1,4 +1,5 @@
 """Actual constructor / chunk OOM -> CPU must stay coherent with health, default and guards."""
+from tests.server_isolation import assert_server_owned_paths
 import importlib
 import json
 
@@ -79,6 +80,7 @@ def test_health_default_and_guards_follow_actual_fallback(tmp_path, monkeypatch)
     monkeypatch.setenv('T2A_LIBRARY_DIR', str(tmp_path / 'library'))
     import server
     importlib.reload(server)
+    assert_server_owned_paths(server, tmp_path)
     monkeypatch.setattr(server, 'studio_engine_available', lambda: True)
     with TestClient(server.app) as c:
         body = c.get('/api/health').json()

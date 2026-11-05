@@ -1,4 +1,5 @@
 """Late studio refusal (load or inference): fatal, no retry, own cleanup, actionable API/SSE."""
+from tests.server_isolation import assert_server_owned_paths
 import importlib
 import io
 import json
@@ -98,6 +99,7 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setenv("T2A_LIBRARY_DIR", str(tmp_path / "library"))
     import server
     importlib.reload(server)
+    assert_server_owned_paths(server, tmp_path)
     # Initial GPU precheck passes; the refusal only happens late, in the factory.
     monkeypatch.setattr(server, "device_decision", lambda: server.DeviceDecision("cuda", True, ""))
 

@@ -1,4 +1,5 @@
 """CPU fallback tests. torch and settings are mocked: no GPU is needed."""
+from tests.server_isolation import assert_server_owned_paths
 import io
 import json
 import importlib
@@ -152,6 +153,7 @@ def make_client(tmp_path, monkeypatch):
             monkeypatch.delenv('T2A_DEVICE', raising=False)
         import server
         importlib.reload(server)
+        assert_server_owned_paths(server, tmp_path)
         monkeypatch.setattr(server, 'studio_engine_available', lambda: True)
         return server, TestClient(server.app)
     return make
