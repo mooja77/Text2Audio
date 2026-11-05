@@ -39,7 +39,7 @@ from backend.consent import read_consent, write_consent, LICENSE, ATTRIBUTION
 from backend.quality import build_chapter_export, quality_report
 from backend.cache import ChunkCache
 from backend.licenses import load_components
-from backend.firstrun import first_run_checklist, friendly_error
+from backend.firstrun import first_run_checklist
 from backend.model_download import ModelUnavailable
 from backend.device_fallback import DeviceDecision, StudioUnavailable, build_kokoro, resolve_device
 from pipeline.clone_synth import ClonedSynthesizer
@@ -485,9 +485,10 @@ def voice_preview(req: PreviewRequest):
             audio = synth.preview(_PREVIEW_TEXT)
         else:
             audio = synth.synth_chunks([_PREVIEW_TEXT])
-    except ModelUnavailable as exc:
+    except ModelUnavailable:
         return JSONResponse(status_code=409, content={
-            "detail": friendly_error(exc), "error": "model_unavailable", "voice": req.voice})
+            "detail": "Voice files are missing or damaged. Run Install Text2Audio.bat again to repair them.",
+            "error": "model_unavailable", "voice": req.voice})
     except StudioUnavailable as exc:
         return JSONResponse(status_code=409, content={
             "detail": str(exc), "error": "studio_unavailable", "voice": req.voice})

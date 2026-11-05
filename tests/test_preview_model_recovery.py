@@ -1,5 +1,8 @@
 """Preview repair errors remain actionable without poisoning the render lock."""
 import socket
+import shutil
+import subprocess
+from pathlib import Path
 import numpy as np
 import pytest
 from fastapi.testclient import TestClient
@@ -41,6 +44,11 @@ def test_missing_model_preview_is_json_and_releases_resources(tmp_path, monkeypa
             assert 'Install Text2Audio.bat' in response.json()['detail']
             assert 'Traceback' not in response.text and str(tmp_path) not in response.text
             assert not server._render_lock.locked()
+        node = shutil.which('node')
+        assert node, 'Node is required for the existing UI behavior regression'
+        ui = subprocess.run([node, str(Path(__file__).with_name('ui_behavior.js')), response.text],
+                            capture_output=True, text=True, timeout=30)
+        assert ui.returncode == 0, ui.stdout + ui.stderr
         assert len(closed) == (2 if failure_stage == 'inference' else 0)
         class ReadySynth:
             def preview(self, text):

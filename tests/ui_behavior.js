@@ -47,6 +47,11 @@ const scenarios = [
     fetch: async () => resp(true, 200, '') },
 ];
 
+if (process.argv[2]) scenarios.push({
+  name: 'actual model recovery 409', play: okPlay, msg: /Install Text2Audio\.bat.*repair/i,
+  fetch: async () => resp(false, 409, process.argv[2]),
+});
+
 const targets = [
   { label: 'Create.preview', initial: PLAY + ' Preview',
     run: (e) => e.Create.preview(), prefix: '' },
