@@ -3,6 +3,13 @@ from backend.offline import configure_at_startup, models_cached
 
 OFFLINE_STATE = configure_at_startup()  # must run before huggingface_hub/transformers are imported
 
+try:
+    from scripts import launch_checks as _lc
+except ImportError:  # not shipped in a pip install
+    _lc = None
+if _lc is not None:
+    _lc.bootstrap_or_exit()  # plain message instead of a traceback if FastAPI/soundfile are missing
+
 import io
 import importlib.util
 import os
@@ -48,7 +55,7 @@ ROOT = Path(__file__).parent
 
 # The only security boundary is the loopback bind (no auth). Not configurable.
 BIND_HOST = "127.0.0.1"
-BIND_PORT = 8765
+BIND_PORT = _lc.port_from_env(os.environ) if _lc is not None else 8765  # T2A_PORT, loopback only
 
 
 def assert_loopback(host: str) -> None:
@@ -191,7 +198,7 @@ async def reject_cross_site_mutations(request: Request, call_next):
     if request.method not in {"GET", "HEAD", "OPTIONS"} and request.url.path.startswith("/api/"):
         origin = request.headers.get("origin")
         fetch_site = request.headers.get("sec-fetch-site", "")
-        allowed = {"http://127.0.0.1:8765", "http://localhost:8765"}
+        allowed = {f"http://127.0.0.1:{BIND_PORT}", f"http://localhost:{BIND_PORT}"}
         if (origin and origin.rstrip("/") not in allowed) or fetch_site == "cross-site":
             return Response(content='{"detail":"cross-site request rejected"}', status_code=403,
                             media_type="application/json")
@@ -204,7 +211,7 @@ def health():
     decision = device_decision()
     espeak = shutil.which("espeak-ng") or os.environ.get("PHONEMIZER_ESPEAK_PATH")
     items = first_run_checklist(bool(ffmpeg), bool(espeak), models_cached(), LIBRARY_DIR)
-    return {"status": "ok", "bind": f"{BIND_HOST}:{BIND_PORT}",
+    return {"status": "ok", "pid": os.getpid(), "bind": f"{BIND_HOST}:{BIND_PORT}",
             "ffmpeg": bool(ffmpeg), "espeak": bool(espeak),
             "checklist": items, "ready": all(i["ok"] for i in items),
             "libraryWritable": os.access(LIBRARY_DIR, os.W_OK),
@@ -626,13 +633,35 @@ def _mount_static():
 _mount_static()
 
 
+def launch_preflight() -> int:
+    """Installed? port free? log written? Prints plain-words results; 0 means go."""
+    return 0 if _lc is None else _lc.run_preflight(port=BIND_PORT)
+
+
 def main():
     import uvicorn
     host, port = BIND_HOST, BIND_PORT
     assert_loopback(host)
-    if os.environ.get("T2A_NO_BROWSER") != "1":
-        threading.Timer(0.8, lambda: webbrowser.open(f"http://{host}:{port}")).start()
-    uvicorn.run(app, host=host, port=port, log_level="info")
+    code = launch_preflight()
+    if code:
+        raise SystemExit(code)
+    cancel = threading.Event()
+    if _lc is not None and os.environ.get("T2A_NO_BROWSER") != "1":
+        # Opens only once this process answers /api/health, i.e. after a real bind.
+        threading.Thread(target=_lc.wait_and_open, daemon=True, kwargs=dict(
+            url=f"http://{host}:{port}", health_url=f"http://{host}:{port}/api/health",
+            cancel=cancel, expected_pid=os.getpid())).start()
+    try:
+        uvicorn.run(app, host=host, port=port, log_level="info")
+    except (OSError, SystemExit) as exc:
+        if isinstance(exc, SystemExit) and not exc.code:
+            raise
+        cancel.set()
+        if _lc is not None:
+            _lc.report_bind_failure(port)  # bind race after the probe: plain words, no errno
+        raise SystemExit(1) from None
+    finally:
+        cancel.set()
 
 
 if __name__ == "__main__":
