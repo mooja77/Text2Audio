@@ -8,6 +8,7 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setenv("T2A_LIBRARY_DIR", str(tmp_path / "library"))
     import importlib, server
     importlib.reload(server)
+    monkeypatch.setattr(server, "device_decision", lambda: server.DeviceDecision("cuda", True, ""))
     with TestClient(server.app) as c:
         yield c
 
@@ -395,9 +396,9 @@ def test_voices_list_studio_narrator_first(client):
 
 def test_health_reports_default_voice(client, monkeypatch):
     import server
-    monkeypatch.setattr(server, "studio_engine_available", lambda: True)
+    monkeypatch.setattr(server, "device_decision", lambda: server.DeviceDecision("cuda", True, ""))
     assert client.get("/api/health").json()["defaultVoice"] == "studio_narrator"
-    monkeypatch.setattr(server, "studio_engine_available", lambda: False)
+    monkeypatch.setattr(server, "device_decision", lambda: server.DeviceDecision("cpu", False, "x"))
     assert client.get("/api/health").json()["defaultVoice"] == "af_heart"
 
 

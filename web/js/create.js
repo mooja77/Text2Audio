@@ -50,6 +50,36 @@ const Create = {
       </div>`;
     this.bind();
     Onboarding.bind();
+    this.refreshVoices();
+  },
+
+  // Rebuild the narrator list from the latest health/voices; blocked voices are disabled with a plain reason.
+  refreshVoices() {
+    const sel = document.getElementById("f-voice");
+    if (!sel || !T2A.state.voices.length) return;
+    const h = T2A.state.health;
+    const unavailable = h && h.studio && !h.studio.available ? h.studio.reason : "";
+    const cur = T2A.state.voices.find(v => v.id === T2A.state.voice);
+    if ((!cur || T2A.voiceBlocked(cur)) && h && T2A.state.voices.some(v => v.id === h.defaultVoice)) T2A.state.voice = h.defaultVoice;
+    const opt = v => {
+      const blocked = T2A.voiceBlocked(v);
+      const label = T2A.esc(v.label) + (blocked ? " (unavailable)" : v.kind === "cloned" ? " (cloned)" : " · " + T2A.esc(v.accent) + " " + T2A.esc(v.gender));
+      return '<option value="' + T2A.esc(v.id) + '"' + (v.id === T2A.state.voice ? " selected" : "") + (blocked ? " disabled" : "") + ">" + label + "</option>";
+    };
+    const group = (label, kind) => {
+      const o = T2A.state.voices.filter(v => v.kind === kind).map(opt).join("");
+      return o ? '<optgroup label="' + label + '">' + o + "</optgroup>" : "";
+    };
+    sel.innerHTML = group("Studio voice (best quality, needs a graphics card)", "studio")
+      + group("Fast voices (Kokoro, any PC)", "preset") + group("Your voices", "cloned");
+    sel.value = T2A.state.voice;
+    let note = document.getElementById("voice-note");
+    if (!note) {
+      note = document.createElement("div");
+      note.id = "voice-note"; note.className = "muted"; note.setAttribute("role", "status");
+      sel.closest(".field").appendChild(note);
+    }
+    note.textContent = unavailable ? "Studio voice and cloning are unavailable: " + unavailable : "";
   },
 
   savedSetting(name) {
@@ -189,11 +219,11 @@ const Create = {
       const r = await fetch("/api/voice-preview", { method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ voice: T2A.state.voice }) });
-      if (!r.ok) throw new Error(await r.text());
+      if (!r.ok) throw Object.assign(new Error(T2A.friendly(await r.text(), r.status)), { safe: true });
       const blob = await r.blob(); const url = URL.createObjectURL(blob); const audio = new Audio(url);
       audio.onended = audio.onerror = () => URL.revokeObjectURL(url); await audio.play();
-    } catch (e) { T2A.toast("Preview failed"); }
-    btn.textContent = "▶ Preview";
+    } catch (e) { T2A.alert(T2A.safeMsg(e, "Preview failed. Please try again.")); }
+    finally { btn.textContent = "▶ Preview"; T2A.refreshHealth(); }
   },
 
   async generate() {
@@ -220,7 +250,7 @@ const Create = {
       localStorage.setItem("text2audio.activeJob", jobId);
       T2A.state.activeJob = jobId;
       Onboarding.advanceTo(3);
-    } catch (e) { T2A.alert("Could not start render"); gen.disabled = false; return; }
+    } catch (e) { T2A.alert(T2A.safeMsg(e, "Could not start render")); T2A.refreshHealth(); gen.disabled = false; return; }
 
     this.attachRender(jobId);
   },
@@ -261,11 +291,11 @@ const Create = {
         document.getElementById("pmsg").textContent = "Done ✓";
         src.close(); gen.disabled = false; localStorage.removeItem("text2audio.activeJob");
         T2A.state.activeJob = null; T2A.state.activeSource = null;
-        T2A.state.firstValue = true; Onboarding.complete();
+        T2A.state.firstValue = true; Onboarding.complete(); T2A.refreshHealth();
         T2A.toast(resumed ? "Render recovered — audiobook ready" : "Audiobook ready"); T2A.showTab("library");
       } else if (e.type === "error") {
         const msg = e.friendly || T2A.friendly(e.message);
-        document.getElementById("pmsg").textContent = msg; T2A.alert(msg);
+        document.getElementById("pmsg").textContent = msg; T2A.alert(msg); T2A.refreshHealth();
         src.close(); gen.disabled = false; localStorage.removeItem("text2audio.activeJob");
         T2A.state.activeJob = null; T2A.state.activeSource = null;
       }

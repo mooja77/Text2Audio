@@ -72,7 +72,17 @@ def serve(engine, stdin, stdout) -> None:
             sf.write(path, wav, int(sr))
             emit({"wav": path, "sr": int(sr)})
         except Exception as exc:
+            from backend.device_fallback import OOM_STUDIO_INFERENCE, is_cuda_oom
+            if is_cuda_oom(exc):
+                # Structured refusal: the parent raises a fatal, non-retried error.
+                emit({"unavailable": OOM_STUDIO_INFERENCE})
+                break
             emit({"error": f"{type(exc).__name__}: {exc}"})
+
+
+def _refuse(out, reason) -> None:
+    out.write(json.dumps({"unavailable": reason}) + "\n")
+    out.flush()
 
 
 def main() -> None:
@@ -83,8 +93,16 @@ def main() -> None:
     configure_at_startup(repos=ENGINE_REPOS.get(name, ()))
     real_out = sys.stdout
     sys.stdout = sys.stderr  # all library chatter -> stderr; protocol -> real_out
-    from pipeline.synth import select_device
-    engine = load_engine(name, select_device())
+    from backend.device_fallback import OOM_STUDIO, is_cuda_oom, worker_device
+    device, reason = worker_device()  # same decision the server makes, re-checked at load
+    if device is None:
+        return _refuse(real_out, reason)
+    try:
+        engine = load_engine(name, device)
+    except Exception as exc:
+        if not is_cuda_oom(exc):
+            raise
+        return _refuse(real_out, OOM_STUDIO)
     serve(engine, sys.stdin, real_out)
 
 

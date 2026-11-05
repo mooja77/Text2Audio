@@ -12,7 +12,7 @@ const T2A = {
   // Plain-language text for any server error; never raw JSON or stack text.
   friendly(text, status) {
     let detail = String(text || "");
-    try { const j = JSON.parse(detail); detail = String(j.detail ?? j.error ?? ""); } catch {}
+    try { const j = JSON.parse(detail); if (j.error === "studio_unavailable") return String(j.detail); detail = String(j.detail ?? j.error ?? ""); } catch {}
     const rules = [
       [/unknown voice/i, "That narrator voice is no longer available. Pick another voice and try again."],
       [/already in progress/i, "Another audiobook is being made right now. Wait for it to finish, then try again."],
@@ -27,6 +27,20 @@ const T2A = {
     if (detail && detail.length < 120 && !/traceback|error|exception|\.py|file "/i.test(detail)) return detail;
     return "Something went wrong. Please try again. If it keeps happening, check the setup checklist at the top of the page.";
   },
+  // Plain-words reason a studio/cloned voice cannot run on this device, or "".
+  voiceBlocked(v) {
+    const h = T2A.state.health;
+    return v && v.kind !== "preset" && h && h.studio && !h.studio.available ? h.studio.reason : "";
+  },
+  cpuNotice(h) {
+    const box = document.getElementById("firstrun");
+    if (!box || !h || !h.studio || h.studio.available) return;
+    box.hidden = false;
+    const p = document.createElement("p");
+    p.className = "fr-ready"; p.id = "cpu-note";
+    p.textContent = "Running on your processor with the fast voices. " + h.studio.reason;
+    box.appendChild(p);
+  },
   renderChecklist(items) {
     const box = document.getElementById("firstrun");
     if (!box || !Array.isArray(items)) return;
@@ -38,9 +52,24 @@ const T2A = {
     box.innerHTML = `<h2 class="fr-title">Finish setting up</h2><ul class="fr-list">` + items.map(i =>
       `<li class="${i.ok ? "ok" : "bad"}"><span class="fr-state">${i.ok ? "✓ Ready" : "✗ Needs attention"}</span> <strong>${T2A.esc(i.label)}</strong> — ${T2A.esc(i.detail)}${i.ok ? "" : `<div class="fr-action">What to do: ${T2A.esc(i.action)}</div>`}</li>`).join("") + `</ul>`;
   },
+  safeMsg(e, fallback) { return e && e.safe ? e.message : fallback; },
+  // Reload health + voices after a real load/chunk fallback or failed job, then refresh both UIs.
+  async refreshHealth() {
+    try {
+      const health = await T2A.api("/api/health");
+      T2A.state.health = health;
+      T2A.state.voices = await T2A.api("/api/voices");
+      const cur = T2A.state.voices.find(v => v.id === T2A.state.voice);
+      if ((!cur || T2A.voiceBlocked(cur)) && T2A.state.voices.some(v => v.id === health.defaultVoice)) T2A.state.voice = health.defaultVoice;
+      T2A.renderChecklist(health.checklist);
+      T2A.cpuNotice(health);
+      Create.refreshVoices();
+      Voices.syncClone();
+    } catch (e) { /* keep the last known state */ }
+  },
   async api(path, opts) {
     const r = await fetch(path, opts);
-    if (!r.ok) throw new Error(T2A.friendly(await r.text(), r.status));
+    if (!r.ok) throw Object.assign(new Error(T2A.friendly(await r.text(), r.status)), { safe: true });
     return r.headers.get("content-type")?.includes("application/json") ? r.json() : r;
   },
   // Assertive announcement for errors (region lives in index.html).
@@ -87,7 +116,9 @@ window.addEventListener("DOMContentLoaded", async () => {
   };
   try {
     const health = await T2A.api("/api/health");
+    T2A.state.health = health;
     T2A.renderChecklist(health.checklist);
+    T2A.cpuNotice(health);
     const missing = [!health.ffmpeg && "ffmpeg", !health.espeak && "espeak-ng",
       !health.libraryWritable && "writable library storage"].filter(Boolean);
     if (missing.length) {
@@ -98,7 +129,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     let saved = {};
     try { saved = JSON.parse(localStorage.getItem("text2audio.settings") || "{}"); }
     catch { localStorage.removeItem("text2audio.settings"); }
-    if (saved.voice && T2A.state.voices.some(v => v.id === saved.voice)) T2A.state.voice = saved.voice;
+    if (saved.voice && T2A.state.voices.some(v => v.id === saved.voice && !T2A.voiceBlocked(v))) T2A.state.voice = saved.voice;
     else if (health.defaultVoice && T2A.state.voices.some(v => v.id === health.defaultVoice)) T2A.state.voice = health.defaultVoice;
     if (Number.isFinite(saved.speed)) T2A.state.speed = saved.speed;
     T2A.state.firstValue = (await T2A.api("/api/library")).length > 0;

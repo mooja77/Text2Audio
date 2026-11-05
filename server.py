@@ -36,6 +36,7 @@ from backend.quality import build_chapter_export, quality_report
 from backend.cache import ChunkCache
 from backend.licenses import load_components
 from backend.firstrun import first_run_checklist
+from backend.device_fallback import DeviceDecision, StudioUnavailable, build_kokoro, resolve_device
 from pipeline.clone_synth import ClonedSynthesizer
 from pipeline.engines import DEFAULT_STUDIO_VOICE, STUDIO_VOICES
 from pipeline.normalize import normalize_text, BUILTIN_PRONUNCIATIONS
@@ -108,9 +109,27 @@ def studio_engine_available() -> bool:
     return importlib.util.find_spec("chatterbox") is not None
 
 
+def device_decision():
+    """One answer for health, default voice, engines, clone and render routes."""
+    return resolve_device(engine_installed=studio_engine_available())
+
+
+def _studio_refusal(voice_id):
+    """409 with the plain-words reason when a studio or cloned voice cannot run here.
+
+    Never substitutes another narrator. Unknown voices fall through to the 422 path."""
+    d = device_decision()
+    known = voice_id in STUDIO_VOICES or (voice_id not in PRESET_VOICES
+                                          and voices.get(voice_id) is not None)
+    if d.studio or not known:
+        return None
+    return JSONResponse(status_code=409, content={
+        "detail": d.reason, "error": "studio_unavailable", "voice": voice_id})
+
+
 def default_voice() -> str:
     """The studio narrator when its engine is installed, else Kokoro's af_heart."""
-    return DEFAULT_STUDIO_VOICE if studio_engine_available() else "af_heart"
+    return device_decision().default_voice
 
 
 class RenderRequest(BaseModel):
@@ -148,7 +167,8 @@ def _unknown_voice_response(voice_id):
 
 
 def resolve_synth(voice_id, speed):
-    return resolve_synthesizer(voice_id, speed, voices)
+    return resolve_synthesizer(voice_id, speed, voices,
+                               factory=lambda v, s: build_kokoro(v, s, device_decision().device))
 
 
 SYNTH_FACTORY = resolve_synth
@@ -181,16 +201,17 @@ async def reject_cross_site_mutations(request: Request, call_next):
 @app.get("/api/health")
 def health():
     ffmpeg = shutil.which("ffmpeg")
+    decision = device_decision()
     espeak = shutil.which("espeak-ng") or os.environ.get("PHONEMIZER_ESPEAK_PATH")
     items = first_run_checklist(bool(ffmpeg), bool(espeak), models_cached(), LIBRARY_DIR)
     return {"status": "ok", "bind": f"{BIND_HOST}:{BIND_PORT}",
             "ffmpeg": bool(ffmpeg), "espeak": bool(espeak),
             "checklist": items, "ready": all(i["ok"] for i in items),
             "libraryWritable": os.access(LIBRARY_DIR, os.W_OK),
-            "voiceCloning": studio_engine_available(),
-            "studioVoices": studio_engine_available(),
-            "defaultVoice": default_voice(),
-            "device": select_device(),
+            "voiceCloning": decision.studio,
+            "studioVoices": decision.studio,
+            "defaultVoice": decision.default_voice,
+            "device": decision.device, **decision.health_fields(),
             "libraryPath": os.path.abspath(LIBRARY_DIR),
             "voicesWritable": os.access(VOICES_DIR, os.W_OK)}
 
@@ -239,6 +260,7 @@ def _launch_render(req: RenderRequest, cover_data: bytes | None = None):
         # Checked before any library directory is created: no side effects.
         return _unknown_voice_response(exc.voice_id)
     refusal = _clone_consent_refusal(req.voice)
+    refusal = _studio_refusal(req.voice) or refusal
     if refusal is not None:  # before any library directory is created
         return refusal
     # Serialize renders: concurrent GPU inference from two threads is unsafe.
@@ -439,6 +461,9 @@ _PREVIEW_TEXT = "This is a sample of the selected narrator voice."
 
 @app.post("/api/voice-preview")
 def voice_preview(req: PreviewRequest):
+    blocked = _studio_refusal(req.voice)
+    if blocked is not None:
+        return blocked
     try:
         validate_voice(req.voice, voices)
     except UnknownVoiceError as exc:
@@ -455,6 +480,9 @@ def voice_preview(req: PreviewRequest):
             audio = synth.preview(_PREVIEW_TEXT)
         else:
             audio = synth.synth_chunks([_PREVIEW_TEXT])
+    except StudioUnavailable as exc:
+        return JSONResponse(status_code=409, content={
+            "detail": str(exc), "error": "studio_unavailable", "voice": req.voice})
     finally:
         if synth is not None and hasattr(synth, "close"):
             synth.close()
@@ -558,6 +586,10 @@ def clone_consent_set(req: ConsentRequest):
 @app.post("/api/voices/clone")
 async def voices_clone(name: str = Form(...), audio: UploadFile = File(...),
                        refText: str = Form("")):
+    d = device_decision()
+    if not d.studio:
+        return JSONResponse(status_code=409, content={
+            "detail": d.reason, "error": "studio_unavailable"})
     if not read_consent(CONSENT_PATH)["acknowledged"]:
         return JSONResponse(status_code=403, content={
             "detail": "voice-rights confirmation required", "error": "consent_required",

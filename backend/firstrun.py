@@ -21,6 +21,9 @@ _FRIENDLY = [
 
 def friendly_error(message) -> str:
     """Map any error text to a short plain-language sentence."""
+    from backend.device_fallback import StudioUnavailable
+    if isinstance(message, StudioUnavailable):
+        return str(message)  # safe, typed, plain-words reason (no reinstall advice)
     text = str(message or "")
     for pattern, friendly in _FRIENDLY:
         if re.search(pattern, text, re.IGNORECASE):
