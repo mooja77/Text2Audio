@@ -8,3 +8,9 @@ def _reset_runtime_fallback():
     df.reset_runtime_fallback()
     yield
     df.reset_runtime_fallback()
+
+
+@pytest.fixture(autouse=True)
+def _isolated_log_dir(tmp_path, monkeypatch):
+    """Launch/server logs never touch the real per-user log folder during tests."""
+    monkeypatch.setenv("T2A_LOG_DIR", str(tmp_path / "t2a-logs"))

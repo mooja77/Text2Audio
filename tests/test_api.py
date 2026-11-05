@@ -500,6 +500,7 @@ def test_main_binds_only_loopback(monkeypatch):
     monkeypatch.setenv("T2A_NO_BROWSER", "1")
     seen = []
     monkeypatch.setattr(uvicorn, "run", lambda app, **kw: seen.append(kw))
+    monkeypatch.setattr(server, "launch_preflight", lambda: 0)  # no real port probe in CI
     server.main()
     assert [kw["host"] for kw in seen] == ["127.0.0.1"]
 
