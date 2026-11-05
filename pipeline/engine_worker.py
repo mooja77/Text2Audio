@@ -72,6 +72,11 @@ def serve(engine, stdin, stdout) -> None:
             sf.write(path, wav, int(sr))
             emit({"wav": path, "sr": int(sr)})
         except Exception as exc:
+            from backend.device_fallback import OOM_STUDIO_INFERENCE, is_cuda_oom
+            if is_cuda_oom(exc):
+                # Structured refusal: the parent raises a fatal, non-retried error.
+                emit({"unavailable": OOM_STUDIO_INFERENCE})
+                break
             emit({"error": f"{type(exc).__name__}: {exc}"})
 
 

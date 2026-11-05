@@ -126,6 +126,9 @@ class NeuralSynthesizer(BaseSynthesizer):
             resp = json.loads(line)
         except json.JSONDecodeError as exc:
             raise FatalSynthError("voice engine worker returned an invalid response") from exc
+        if isinstance(resp, dict) and resp.get("unavailable"):
+            _terminate(self._proc)  # close/reap only this synthesizer's own worker
+            raise StudioUnavailable(str(resp["unavailable"])[:500])
         if "error" in resp:
             # A per-chunk model error: let the base class retry once, then abort.
             raise RuntimeError(f"voice engine synthesis failed: {resp['error']}")

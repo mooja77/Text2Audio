@@ -15,6 +15,7 @@ from dataclasses import dataclass
 
 from backend import hardware
 from pipeline.engines import DEFAULT_STUDIO_VOICE
+from pipeline.synth import FatalSynthError
 
 MIN_FREE_GB = hardware.MIN_VRAM_GB
 NEED = ('The studio voice and voice cloning need an NVIDIA graphics card with at least '
@@ -33,9 +34,12 @@ NOT_INSTALLED = ('The studio voice engine (Chatterbox) is not installed. Run Ins
 OOM_STUDIO = ('The graphics card ran out of memory while loading the studio voice, so the studio '
               'voice and voice cloning are unavailable right now. Close other programs that use '
               'the graphics card, or use a fast voice.')
+OOM_STUDIO_INFERENCE = ('The graphics card ran out of memory while making the studio voice, so the '
+                        'studio voice and voice cloning stopped. Close other programs that use the '
+                        'graphics card and try again, or choose a fast voice.')
 
 
-class StudioUnavailable(RuntimeError):
+class StudioUnavailable(FatalSynthError, RuntimeError):
     """The studio voice or cloning cannot run here; the message is plain words."""
 
 
