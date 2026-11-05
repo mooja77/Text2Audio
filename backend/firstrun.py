@@ -8,6 +8,9 @@ GENERIC_ERROR = ("Something went wrong. Please try again. If it keeps happening,
 
 _FRIENDLY = [
     (r"no space left|disk full", "Your disk is full. Free up some space and try again."),
+    (r"en_core_web_sm|language model|model files are missing",
+     "A voice model or the English language package is missing or damaged. Double-click "
+     "Install Text2Audio.bat to repair it. It is safe to run again."),
     (r"ffmpeg", "A required audio tool is missing. Check the setup checklist at the top of the page."),
     (r"chatterbox|voice engine worker",
      "The studio voice engine is not available. Choose a Kokoro narrator, or run "
@@ -49,9 +52,9 @@ def first_run_checklist(ffmpeg_ok, espeak_ok, models_ok, storage_path):
          "action": "" if espeak_ok else
          "Run Install Text2Audio.bat again, or install espeak-ng and restart Text2Audio."},
         {"id": "models", "label": "Voice model download", "ok": bool(models_ok),
-         "detail": "Downloaded. Text2Audio works offline." if models_ok else "Not downloaded yet.",
+         "detail": "Downloaded. Text2Audio works offline." if models_ok else "Voice models or English language package missing.",
          "action": "" if models_ok else
-         "Connect to the internet and make your first audiobook. The download (a few hundred MB) happens once."},
+         "Double-click Install Text2Audio.bat to download the voice models and the English language package. It is a large one-time download and safe to run again; finished files are kept."},
         {"id": "disk", "label": "Free disk space", "ok": disk_ok,
          "detail": f"{gb:.1f} GB free." if disk_ok else f"Only {gb:.1f} GB free.",
          "action": "" if disk_ok else
