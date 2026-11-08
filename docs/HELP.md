@@ -12,6 +12,12 @@ Use your browser's page search (`Ctrl+F` or `Cmd+F`) here, or open the searchabl
 
 Experienced users can skip the guide and install with `pip`; the [README](../README.md) has the fast path.
 
+TXT, Markdown and text-based PDF imports keep recognised chapter headings such
+as `CHAPTER 1` or `## Chapter title`. Text before the first heading becomes an
+Introduction. EPUB chapters follow the book's reading order. Review the detected
+list before generating; files without recognised headings become one chapter.
+Scanned PDFs need text recognition in another tool before import.
+
 ## Recovery
 
 An active render continues if only the browser page is refreshed. The page stores the non-sensitive job ID and reconnects to the server's event history. If the Text2Audio process itself stops, start that render again. Finished books remain in `library/` with durable manifests.
@@ -28,9 +34,9 @@ Text2Audio remembers title, author, voice, speed and guide progress in local bro
 - **Publishing:** use the quality report and chapter export in Library. Distribution
   presets still require editorial listening and the distributor's own validation.
 - **"Unknown voice" when generating:** the chosen narrator is no longer available (for example a cloned voice was deleted). Pick another narrator and generate again; nothing was added to your library.
-- **Cloning asks me to confirm I have the right to clone a voice:** only clone your own voice, a voice whose owner has given you permission, or a public-domain recording. Cloning uses Chatterbox (MIT), so audiobooks made with a voice you have the right to use can be sold. Tick the box once; Text2Audio remembers it on this computer. Books made with a cloned voice are marked "non-commercial" in their details.
+- **Cloning asks me to confirm I have the right to clone a voice:** only clone your own voice, a voice whose owner has given you permission, or a public-domain recording. Cloning uses Chatterbox (MIT), so audiobooks made with a voice you have the right to use can be sold. Tick the box once; Text2Audio remembers it on this computer. Older books made with F5-TTS keep their "non-commercial" mark until you render them again with Chatterbox.
 - **Wrong pronunciation:** add a rule in the Pronounce tab, preview, and regenerate.
-- **First model download:** the first narration downloads model files; later runs use the local cache. Once the model is cached, restart Text2Audio and it runs in offline mode: rendering makes no network connections.
+- **Models are missing:** the Windows installer prepares the pinned voice models and English language package before first use. Run it again to repair missing or damaged files. Manual and pip installations need the preparation steps in the README. Once all required files are ready, Text2Audio uses them locally in offline mode.
 
 ## First-run checklist
 

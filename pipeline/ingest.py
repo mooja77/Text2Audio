@@ -5,6 +5,8 @@ the `## ` marker that pipeline.parse splits on."""
 import os
 import re
 
+from pipeline.parse import parse_chapters
+
 _HR = re.compile(r"^\s*([-*_]\s*){3,}$")
 _H1 = re.compile(r"^\s*#\s+(.+?)\s*$", re.MULTILINE)
 
@@ -60,6 +62,18 @@ def section_from_text(filename: str, raw: str) -> tuple[str, str]:
 def build_book_text(sources: list[tuple[str, str]]) -> str:
     sections = []
     for filename, content in sources:
+        if os.path.splitext(filename)[1].lower() in {".txt", ".md", ".markdown", ".pdf"}:
+            # Detect headings before Markdown cleanup erases them. Preserve the
+            # original title, including meaningful parentheticals, rather than
+            # applying the POV-tag trimming used for ordinary H1 source titles.
+            chapters = parse_chapters(content, default_title="")
+            ordinary_h1 = len(chapters) == 1 and _H1.search(content) is not None
+            if chapters and not ordinary_h1 and (len(chapters) > 1 or chapters[0].title):
+                for chapter in chapters:
+                    title = clean_markdown(chapter.title)
+                    narrated = f"{_spoken_heading(title)}\n\n{clean_markdown(chapter.text)}"
+                    sections.append(f"## {title}\n{narrated}")
+                continue
         marker, narrated = section_from_text(filename, content)
         sections.append(f"## {marker}\n{narrated}")
     return "\n\n".join(sections) + "\n"

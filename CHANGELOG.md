@@ -6,6 +6,11 @@ All notable changes to Text2Audio are recorded here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- Preserve recognised chapter headings when importing TXT, Markdown and text-based PDF books.
+- Clarify model preparation and the commercial-use label on older F5-TTS books in Help.
+
 ### Added
 
 - I-1: NVIDIA and post-install CUDA/free-memory checks, with hardware results
