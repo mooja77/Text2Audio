@@ -76,3 +76,9 @@ def test_detected_uppercase_markdown_headings_have_no_spoken_markup():
     chapters = imported_chapters('book.md', b'# TITLE\n\nCHAPTER 1\nAlpha.\nCHAPTER 2\nBeta.')
     assert [c.title for c in chapters] == ['TITLE', 'CHAPTER 1', 'CHAPTER 2']
     assert all('#' not in c.title and '#' not in c.text for c in chapters)
+
+
+def test_detected_titles_keep_leading_years_or_chapter_numbers():
+    chapters = imported_chapters('book.md', b'## 1914. SUMMER\nAlpha.\n## 1915. WINTER\nBeta.')
+    assert [c.title for c in chapters] == ['1914. SUMMER', '1915. WINTER']
+    assert '1914.' in chapters[0].text and '1915.' in chapters[1].text
