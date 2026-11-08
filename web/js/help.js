@@ -1,5 +1,5 @@
 const GUIDE_STEPS = [
-  ["Add your text", "Choose .txt or Markdown files. New here? Use the safe example."],
+  ["Add your text", "Choose TXT, Markdown, DOCX, EPUB or a text-based PDF. New here? Use the safe example."],
   ["Check the chapters", "Read the detected chapter list and drag files into the right order."],
   ["Choose a narrator", "Pick a voice and use Preview before starting a long render."],
   ["Generate", "Keep Text2Audio running. You can refresh this page and reconnect to the active job."],
