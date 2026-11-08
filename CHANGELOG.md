@@ -9,6 +9,7 @@ All notable changes to Text2Audio are recorded here. The format follows
 ### Fixed
 
 - Preserve recognised chapter headings when importing TXT, Markdown and text-based PDF books.
+- Keep leading chapter numbers and years in detected titles and narration.
 - Clarify model preparation and the commercial-use label on older F5-TTS books in Help.
 
 ### Added

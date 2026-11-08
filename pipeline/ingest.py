@@ -11,7 +11,7 @@ _HR = re.compile(r"^\s*([-*_]\s*){3,}$")
 _H1 = re.compile(r"^\s*#\s+(.+?)\s*$", re.MULTILINE)
 
 
-def clean_markdown(text: str) -> str:
+def clean_markdown(text: str, *, preserve_leading_numbers: bool = False) -> str:
     out = []
     for ln in text.splitlines():
         s = ln.rstrip()
@@ -22,7 +22,8 @@ def clean_markdown(text: str) -> str:
         s = re.sub(r"^\s*>\s?", "", s)
         s = re.sub(r"^\s*#{1,6}\s*", "", s)
         s = re.sub(r"^\s*[-*+]\s+", "", s)
-        s = re.sub(r"^\s*\d+\.\s+", "", s)
+        if not preserve_leading_numbers:
+            s = re.sub(r"^\s*\d+\.\s+", "", s)
         s = re.sub(r"!\[[^\]]*\]\([^)]*\)", "", s)
         s = re.sub(r"\[([^\]]+)\]\([^)]*\)", r"\1", s)
         s = re.sub(r"\*\*([^*]+)\*\*", r"\1", s)
@@ -70,7 +71,7 @@ def build_book_text(sources: list[tuple[str, str]]) -> str:
             ordinary_h1 = len(chapters) == 1 and _H1.search(content) is not None
             if chapters and not ordinary_h1 and (len(chapters) > 1 or chapters[0].title):
                 for chapter in chapters:
-                    title = clean_markdown(chapter.title)
+                    title = clean_markdown(chapter.title, preserve_leading_numbers=True)
                     narrated = f"{_spoken_heading(title)}\n\n{clean_markdown(chapter.text)}"
                     sections.append(f"## {title}\n{narrated}")
                 continue
